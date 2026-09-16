@@ -1,80 +1,28 @@
 --[[
     juanita****.club — Ported from App.tsx / index.css
 
-    Executor compatibility:
-      UDim.fromOffset / UDim2.fromOffset are shimmed (some builds lack them).
-
-    Visual fidelity notes:
-      - CSS box-shadow: inset          -> 1px dark Frame at top of surface
-      - CSS box-shadow: 0 0 Npx accent -> UIStroke with high Transparency
-      - CSS radial-gradient            -> solid BG + transparent ScreenGui
-      - CSS linear-gradient            -> UIGradient (Rotation 90 = top->bottom)
-      - CSS flex gap                   -> UIListLayout.Padding
+    Every UDim / UDim2 constructor is called directly (no cached aliases)
+    so this cannot hit `attempt to call a nil value`.
 ]]
 
 local Game = game;
 
--- Services
 local UserInputService = Game : GetService( "UserInputService" );
 local TweenService      = Game : GetService( "TweenService" );
 local CoreGui           = Game : GetService( "CoreGui" );
 
--- Cache
-local InstanceNew              = Instance.new;
-local TweenInfoNew             = TweenInfo.new;
-local Color3New                = Color3.new;
-local Color3FromRGB            = Color3.fromRGB;
-local UDim2New                 = UDim2.new;
-local UDimNew                  = UDim.new;
-local Vector2New               = Vector2.new;
-local ColorSequenceNew         = ColorSequence.new;
-local ColorSequenceKeypointNew = ColorSequenceKeypoint.new;
+-- ── Small helpers that call constructors directly ────────────────────────────
 
--- Shims: some executors don't expose UDim.fromOffset / UDim2.fromOffset
-local function UDimFromOffset( Offset )
-    return UDimNew( 0, Offset );
+local function Off( N )
+    return UDim.new( 0, N );
 end;
 
-local function UDim2FromOffset( X, Y )
-    return UDim2New( 0, X or 0, 0, Y or 0 );
+local function Off2( X, Y )
+    return UDim2.new( 0, X or 0, 0, Y or 0 );
 end;
-
--- Palette
-const ACCENT        = Color3FromRGB( 212, 90, 16 );
-const ACCENT_BRIGHT = Color3FromRGB( 232, 112, 26 );
-const ACCENT_DIM    = Color3FromRGB( 154, 60, 8 );
-
-const TEXT_DEFAULT  = Color3FromRGB( 160, 160, 160 );
-const TEXT_HOVER    = Color3FromRGB( 184, 184, 184 );
-const TEXT_ACTIVE   = Color3FromRGB( 216, 216, 216 );
-const TEXT_PRIMARY  = Color3FromRGB( 200, 200, 200 );
-const TEXT_MUTED    = Color3FromRGB( 112, 112, 112 );
-const TEXT_FAINT    = Color3FromRGB( 62, 62, 62 );
-
-const SURFACE_TOP   = Color3FromRGB( 37, 37, 37 );
-const SURFACE_BOT   = Color3FromRGB( 24, 24, 24 );
-const SURFACE_HOVER = Color3FromRGB( 45, 45, 45 );
-
-const BG_WINDOW     = Color3FromRGB( 22, 22, 22 );
-const BG_FOOTER     = Color3FromRGB( 14, 14, 14 );
-const BG_DEEP       = Color3FromRGB( 16, 16, 16 );
-
-const BORDER_SOFT   = Color3FromRGB( 54, 54, 54 );
-const BORDER_HOVER  = Color3FromRGB( 74, 74, 74 );
-const BORDER_FAINT  = Color3FromRGB( 40, 40, 40 );
-const BORDER_EDGE   = Color3FromRGB( 13, 13, 13 );
-
-const FONT          = Enum.Font.Gotham;
-const FONT_MEDIUM   = Enum.Font.GothamMedium;
-const FONT_BOLD     = Enum.Font.GothamBold;
-
-const PANEL_WIDTH   = 230;
-const RIGHT_WIDTH   = 190;
-
--- ── Utilities ────────────────────────────────────────────────────────────────
 
 local function Create( Class, Properties )
-    local Object = InstanceNew( Class );
+    local Object = Instance.new( Class );
 
     for Property, Value in pairs( Properties ) do
         Object[ Property ] = Value;
@@ -83,79 +31,110 @@ local function Create( Class, Properties )
     return Object;
 end;
 
-local function ApplyGradient( Object, Stops, Rotation )
+local function RGB( R, G, B )
+    return Color3.fromRGB( R, G, B );
+end;
+
+local function Gradient( Object, Stops, Rotation )
     local Points = { };
 
     for Index, Stop in ipairs( Stops ) do
-        Points[ Index ] = ColorSequenceKeypointNew( Stop[ 1 ], Stop[ 2 ] );
+        Points[ Index ] = ColorSequenceKeypoint.new( Stop[ 1 ], Stop[ 2 ] );
     end;
 
     return Create( "UIGradient", {
-        Color = ColorSequenceNew( Points );
+        Color = ColorSequence.new( Points );
         Rotation = Rotation or 90;
         Parent = Object;
     } );
 end;
 
-local function ApplyCorner( Object, Radius )
+local function Corner( Object, Radius )
     return Create( "UICorner", {
-        CornerRadius = UDimFromOffset( Radius );
+        CornerRadius = UDim.new( 0, Radius );
         Parent = Object;
     } );
 end;
 
-local function ApplyStroke( Object, Color, Thickness, Transparency )
+local function Stroke( Object, Color, Transparency )
     return Create( "UIStroke", {
         Color = Color;
-        Thickness = Thickness or 1;
+        Thickness = 1;
         Transparency = Transparency or 0;
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
         Parent = Object;
     } );
 end;
 
+-- ── Palette (matches ACCENT / ACCENT_BRIGHT / ACCENT_DIM from App.tsx) ───────
+
+local ACCENT        = RGB( 212, 90, 16 );
+local ACCENT_BRIGHT = RGB( 232, 112, 26 );
+local ACCENT_DIM    = RGB( 154, 60, 8 );
+
+local TEXT_DEFAULT  = RGB( 160, 160, 160 );
+local TEXT_HOVER    = RGB( 184, 184, 184 );
+local TEXT_ACTIVE   = RGB( 216, 216, 216 );
+local TEXT_PRIMARY  = RGB( 200, 200, 200 );
+local TEXT_MUTED    = RGB( 112, 112, 112 );
+local TEXT_FAINT    = RGB( 62, 62, 62 );
+
+local BG_WINDOW     = RGB( 22, 22, 22 );
+local BG_FOOTER     = RGB( 14, 14, 14 );
+
+local BORDER_SOFT   = RGB( 54, 54, 54 );
+local BORDER_HOVER  = RGB( 74, 74, 74 );
+local BORDER_FAINT  = RGB( 40, 40, 40 );
+local BORDER_EDGE   = RGB( 13, 13, 13 );
+
+local FONT          = Enum.Font.Gotham;
+local FONT_MEDIUM   = Enum.Font.GothamMedium;
+local FONT_BOLD     = Enum.Font.GothamBold;
+
+local PANEL_WIDTH   = 230;
+local RIGHT_WIDTH   = 190;
+
 -- ── Atoms ────────────────────────────────────────────────────────────────────
 
 local function MakeCheckbox( Parent, Text, Default, Callback )
     local State = { Value = Default or false, Hovered = false };
 
-    const Container = Create( "Frame", {
+    local Container = Create( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 0, 16 );
+        Size = UDim2.new( 1, 0, 0, 16 );
         Parent = Parent;
     } );
 
-    const Box = Create( "Frame", {
-        Size = UDim2FromOffset( 13, 13 );
-        Position = UDim2FromOffset( 0, 1 );
-        BackgroundColor3 = Color3FromRGB( 32, 32, 32 );
+    local Box = Create( "Frame", {
+        Size = Off2( 13, 13 );
+        Position = Off2( 0, 1 );
         BorderSizePixel = 0;
         Parent = Container;
     } );
-    ApplyCorner( Box, 2 );
+    Corner( Box, 2 );
 
-    const BoxGrad = ApplyGradient( Box, {
-        { 0, Color3FromRGB( 32, 32, 32 ) };
-        { 1, Color3FromRGB( 24, 24, 24 ) };
+    local BoxGrad = Gradient( Box, {
+        { 0, RGB( 32, 32, 32 ) };
+        { 1, RGB( 24, 24, 24 ) };
     }, 90 );
 
-    const BoxStroke = ApplyStroke( Box, BORDER_SOFT, 1, 0 );
+    local BoxStroke = Stroke( Box, BORDER_SOFT );
 
-    const Check = Create( "TextLabel", {
+    local Check = Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 1, 0 );
+        Size = UDim2.new( 1, 0, 1, 0 );
         Text = "✓";
-        TextColor3 = Color3New( 1, 1, 1 );
+        TextColor3 = Color3.new( 1, 1, 1 );
         TextSize = 11;
         Font = FONT_BOLD;
         TextTransparency = 1;
         Parent = Box;
     } );
 
-    const Label = Create( "TextLabel", {
+    local Label = Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 21, 0 );
-        Size = UDim2New( 1, -21, 1, 0 );
+        Position = Off2( 21, 0 );
+        Size = UDim2.new( 1, -21, 1, 0 );
         Text = Text;
         TextColor3 = TEXT_DEFAULT;
         TextSize = 11;
@@ -166,25 +145,25 @@ local function MakeCheckbox( Parent, Text, Default, Callback )
 
     local function Refresh()
         if ( State.Value ) then
-            BoxGrad.Color = ColorSequenceNew( {
-                ColorSequenceKeypointNew( 0, ACCENT );
-                ColorSequenceKeypointNew( 1, ACCENT_DIM );
+            BoxGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, ACCENT );
+                ColorSequenceKeypoint.new( 1, ACCENT_DIM );
             } );
             BoxStroke.Color = ACCENT;
             Check.TextTransparency = 0;
-            Label.TextColor3 = Color3FromRGB( 216, 216, 216 );
+            Label.TextColor3 = TEXT_ACTIVE;
         elseif ( State.Hovered ) then
-            BoxGrad.Color = ColorSequenceNew( {
-                ColorSequenceKeypointNew( 0, SURFACE_TOP );
-                ColorSequenceKeypointNew( 1, Color3FromRGB( 28, 28, 28 ) );
+            BoxGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 37, 37, 37 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 28, 28, 28 ) );
             } );
             BoxStroke.Color = BORDER_HOVER;
             Check.TextTransparency = 1;
             Label.TextColor3 = TEXT_HOVER;
         else
-            BoxGrad.Color = ColorSequenceNew( {
-                ColorSequenceKeypointNew( 0, Color3FromRGB( 32, 32, 32 ) );
-                ColorSequenceKeypointNew( 1, Color3FromRGB( 24, 24, 24 ) );
+            BoxGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 32, 32, 32 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 24, 24, 24 ) );
             } );
             BoxStroke.Color = BORDER_SOFT;
             Check.TextTransparency = 1;
@@ -205,15 +184,8 @@ local function MakeCheckbox( Parent, Text, Default, Callback )
         end;
     end );
 
-    Container.MouseEnter : Connect( function()
-        State.Hovered = true;
-        Refresh();
-    end );
-
-    Container.MouseLeave : Connect( function()
-        State.Hovered = false;
-        Refresh();
-    end );
+    Container.MouseEnter : Connect( function() State.Hovered = true; Refresh(); end );
+    Container.MouseLeave : Connect( function() State.Hovered = false; Refresh(); end );
 
     Refresh();
 
@@ -227,21 +199,21 @@ end;
 local function MakeSlider( Parent, LabelText, Default, Callback )
     local State = { Value = Default or 50, Dragging = false };
 
-    const Container = Create( "Frame", {
+    local Container = Create( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 0, 24 );
+        Size = UDim2.new( 1, 0, 0, 24 );
         Parent = Parent;
     } );
 
-    const LabelRow = Create( "Frame", {
+    local LabelRow = Create( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 0, 14 );
+        Size = UDim2.new( 1, 0, 0, 14 );
         Parent = Container;
     } );
 
     Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 1, 0 );
+        Size = UDim2.new( 1, 0, 1, 0 );
         Text = LabelText;
         TextColor3 = TEXT_DEFAULT;
         TextSize = 11;
@@ -250,9 +222,9 @@ local function MakeSlider( Parent, LabelText, Default, Callback )
         Parent = LabelRow;
     } );
 
-    const ValueLabel = Create( "TextLabel", {
+    local ValueLabel = Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 1, 0 );
+        Size = UDim2.new( 1, 0, 1, 0 );
         Text = tostring( State.Value ) .. "%";
         TextColor3 = ACCENT_BRIGHT;
         TextSize = 11;
@@ -261,61 +233,59 @@ local function MakeSlider( Parent, LabelText, Default, Callback )
         Parent = LabelRow;
     } );
 
-    const Track = Create( "TextButton", {
-        BackgroundColor3 = Color3FromRGB( 16, 16, 16 );
+    local Track = Create( "TextButton", {
+        BackgroundColor3 = RGB( 16, 16, 16 );
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 0, 16 );
-        Size = UDim2New( 1, 0, 0, 5 );
+        Position = Off2( 0, 16 );
+        Size = UDim2.new( 1, 0, 0, 5 );
         Text = "";
         AutoButtonColor = false;
         Parent = Container;
     } );
-    ApplyCorner( Track, 3 );
-    ApplyGradient( Track, {
-        { 0, Color3FromRGB( 16, 16, 16 ) };
-        { 1, Color3FromRGB( 26, 26, 26 ) };
+    Corner( Track, 3 );
+    Gradient( Track, {
+        { 0, RGB( 16, 16, 16 ) };
+        { 1, RGB( 26, 26, 26 ) };
     }, 90 );
-    ApplyStroke( Track, Color3FromRGB( 46, 46, 46 ), 1, 0 );
+    Stroke( Track, RGB( 46, 46, 46 ) );
 
-    const Fill = Create( "Frame", {
+    local Fill = Create( "Frame", {
         BackgroundColor3 = ACCENT;
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 0, 0 );
-        Size = UDim2New( State.Value / 100, 0, 1, 0 );
+        Size = UDim2.new( State.Value / 100, 0, 1, 0 );
         Parent = Track;
     } );
-    ApplyCorner( Fill, 3 );
-    ApplyGradient( Fill, {
+    Corner( Fill, 3 );
+    Gradient( Fill, {
         { 0, ACCENT_DIM };
         { 1, ACCENT_BRIGHT };
     }, 0 );
 
-    const Thumb = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 224, 224, 224 );
+    local Thumb = Create( "Frame", {
+        BackgroundColor3 = RGB( 224, 224, 224 );
         BorderSizePixel = 0;
-        AnchorPoint = Vector2New( 0.5, 0.5 );
-        Position = UDim2New( State.Value / 100, 0, 0.5, 0 );
-        Size = UDim2FromOffset( 9, 9 );
+        AnchorPoint = Vector2.new( 0.5, 0.5 );
+        Position = UDim2.new( State.Value / 100, 0, 0.5, 0 );
+        Size = Off2( 9, 9 );
         ZIndex = 2;
         Parent = Track;
     } );
-    ApplyCorner( Thumb, 100 );
-    ApplyGradient( Thumb, {
-        { 0, Color3FromRGB( 224, 224, 224 ) };
-        { 1, Color3FromRGB( 176, 176, 176 ) };
+    Corner( Thumb, 100 );
+    Gradient( Thumb, {
+        { 0, RGB( 224, 224, 224 ) };
+        { 1, RGB( 176, 176, 176 ) };
     }, 90 );
-    ApplyStroke( Thumb, ACCENT, 1, 0 );
+    Stroke( Thumb, ACCENT );
 
     local function Refresh()
         local Percent = State.Value / 100;
-        Fill.Size = UDim2New( Percent, 0, 1, 0 );
-        Thumb.Position = UDim2New( Percent, 0, 0.5, 0 );
+        Fill.Size = UDim2.new( Percent, 0, 1, 0 );
+        Thumb.Position = UDim2.new( Percent, 0, 0.5, 0 );
         ValueLabel.Text = tostring( State.Value ) .. "%";
     end;
 
     local function FromMouse( MouseX )
-        local Rel = MouseX - Track.AbsolutePosition.X;
-        local Percent = math.clamp( Rel / Track.AbsoluteSize.X, 0, 1 );
+        local Percent = math.clamp( ( MouseX - Track.AbsolutePosition.X ) / Track.AbsoluteSize.X, 0, 1 );
         State.Value = math.floor( Percent * 100 );
 
         Refresh();
@@ -358,33 +328,32 @@ end;
 local function MakeDropdown( Parent, Options, Default, Callback )
     local State = { Value = Default or Options[ 1 ] or "", Open = false, Hovered = nil };
 
-    const Container = Create( "Frame", {
+    local Container = Create( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 0, 20 );
+        Size = UDim2.new( 1, 0, 0, 20 );
         ZIndex = 3;
         Parent = Parent;
     } );
 
-    const Trigger = Create( "TextButton", {
-        BackgroundColor3 = Color3FromRGB( 35, 35, 35 );
+    local Trigger = Create( "TextButton", {
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 1, 0 );
+        Size = UDim2.new( 1, 0, 1, 0 );
         Text = "";
         AutoButtonColor = false;
         Parent = Container;
     } );
-    ApplyCorner( Trigger, 3 );
-    ApplyStroke( Trigger, Color3FromRGB( 58, 58, 58 ), 1, 0 );
+    Corner( Trigger, 3 );
+    Stroke( Trigger, RGB( 58, 58, 58 ) );
 
-    const TriggerGrad = ApplyGradient( Trigger, {
-        { 0, Color3FromRGB( 35, 35, 35 ) };
-        { 1, Color3FromRGB( 26, 26, 26 ) };
+    local TriggerGrad = Gradient( Trigger, {
+        { 0, RGB( 35, 35, 35 ) };
+        { 1, RGB( 26, 26, 26 ) };
     }, 90 );
 
-    const TriggerText = Create( "TextLabel", {
+    local TriggerText = Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 8, 0 );
-        Size = UDim2New( 1, -20, 1, 0 );
+        Position = Off2( 8, 0 );
+        Size = UDim2.new( 1, -20, 1, 0 );
         Text = State.Value;
         TextColor3 = TEXT_PRIMARY;
         TextSize = 11;
@@ -393,29 +362,29 @@ local function MakeDropdown( Parent, Options, Default, Callback )
         Parent = Trigger;
     } );
 
-    const Chevron = Create( "TextLabel", {
+    Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = UDim2New( 1, -14, 0, 0 );
-        Size = UDim2FromOffset( 10, 20 );
+        Position = UDim2.new( 1, -14, 0, 0 );
+        Size = Off2( 10, 20 );
         Text = "v";
-        TextColor3 = Color3FromRGB( 136, 136, 136 );
+        TextColor3 = RGB( 136, 136, 136 );
         TextSize = 10;
         Font = FONT_BOLD;
         Parent = Trigger;
     } );
 
-    const List = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 30, 30, 30 );
+    local List = Create( "Frame", {
+        BackgroundColor3 = RGB( 30, 30, 30 );
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 0, 20 );
-        Size = UDim2New( 1, 0, 0, 0 );
+        Position = Off2( 0, 20 );
+        Size = UDim2.new( 1, 0, 0, 0 );
         ClipsDescendants = true;
         Visible = false;
         ZIndex = 5;
         Parent = Container;
     } );
-    ApplyCorner( List, 3 );
-    ApplyStroke( List, ACCENT, 1, 0 );
+    Corner( List, 3 );
+    Stroke( List, ACCENT );
 
     Create( "UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder;
@@ -425,36 +394,36 @@ local function MakeDropdown( Parent, Options, Default, Callback )
     local Rows = { };
 
     for Index, Option in ipairs( Options ) do
-        const Row = Create( "TextButton", {
+        local Row = Create( "TextButton", {
             BackgroundTransparency = 1;
-            Size = UDim2New( 1, 0, 0, 20 );
+            Size = UDim2.new( 1, 0, 0, 20 );
             Text = "";
             AutoButtonColor = false;
             LayoutOrder = Index;
             Parent = List;
         } );
 
-        const RowAccent = Create( "Frame", {
+        local RowAccent = Create( "Frame", {
             BackgroundColor3 = ACCENT;
             BorderSizePixel = 0;
-            Size = UDim2FromOffset( 2, 20 );
+            Size = Off2( 2, 20 );
             Visible = false;
             Parent = Row;
         } );
 
-        const RowText = Create( "TextLabel", {
+        local RowText = Create( "TextLabel", {
             BackgroundTransparency = 1;
-            Position = UDim2FromOffset( 8, 0 );
-            Size = UDim2New( 1, -8, 1, 0 );
+            Position = Off2( 8, 0 );
+            Size = UDim2.new( 1, -8, 1, 0 );
             Text = Option;
-            TextColor3 = Color3FromRGB( 184, 184, 184 );
+            TextColor3 = RGB( 184, 184, 184 );
             TextSize = 11;
             Font = FONT;
             TextXAlignment = Enum.TextXAlignment.Left;
             Parent = Row;
         } );
 
-        Rows[ Option ] = { Row = Row; Text = RowText; Accent = RowAccent };
+        Rows[ Option ] = { Text = RowText, Accent = RowAccent };
 
         Row.InputBegan : Connect( function( Input )
             if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then
@@ -472,31 +441,22 @@ local function MakeDropdown( Parent, Options, Default, Callback )
             Refresh();
         end );
 
-        Row.MouseEnter : Connect( function()
-            State.Hovered = Option;
-            Refresh();
-        end );
-
-        Row.MouseLeave : Connect( function()
-            State.Hovered = nil;
-            Refresh();
-        end );
+        Row.MouseEnter : Connect( function() State.Hovered = Option; Refresh(); end );
+        Row.MouseLeave : Connect( function() State.Hovered = nil; Refresh(); end );
     end;
 
     local function Refresh()
         if ( State.Open ) then
-            TriggerGrad.Color = ColorSequenceNew( {
-                ColorSequenceKeypointNew( 0, Color3FromRGB( 40, 40, 40 ) );
-                ColorSequenceKeypointNew( 1, Color3FromRGB( 30, 30, 30 ) );
+            TriggerGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 40, 40, 40 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 30, 30, 30 ) );
             } );
         else
-            TriggerGrad.Color = ColorSequenceNew( {
-                ColorSequenceKeypointNew( 0, Color3FromRGB( 35, 35, 35 ) );
-                ColorSequenceKeypointNew( 1, Color3FromRGB( 26, 26, 26 ) );
+            TriggerGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 35, 35, 35 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 26, 26, 26 ) );
             } );
         end;
-
-        Chevron.Rotation = State.Open and 180 or 0;
 
         for Option, Entry in pairs( Rows ) do
             if ( Option == State.Value ) then
@@ -504,18 +464,18 @@ local function MakeDropdown( Parent, Options, Default, Callback )
                 Entry.Text.Font = FONT_BOLD;
                 Entry.Accent.Visible = false;
             elseif ( Option == State.Hovered ) then
-                Entry.Text.TextColor3 = Color3FromRGB( 221, 221, 221 );
+                Entry.Text.TextColor3 = RGB( 221, 221, 221 );
                 Entry.Text.Font = FONT;
                 Entry.Accent.Visible = true;
             else
-                Entry.Text.TextColor3 = Color3FromRGB( 184, 184, 184 );
+                Entry.Text.TextColor3 = RGB( 184, 184, 184 );
                 Entry.Text.Font = FONT;
                 Entry.Accent.Visible = false;
             end;
         end;
 
-        TweenService : Create( List, TweenInfoNew( 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out ), {
-            Size = State.Open and UDim2New( 1, 0, 0, #Options * 20 ) or UDim2New( 1, 0, 0, 0 );
+        TweenService : Create( List, TweenInfo.new( 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out ), {
+            Size = State.Open and UDim2.new( 1, 0, 0, #Options * 20 ) or UDim2.new( 1, 0, 0, 0 );
         } ) : Play();
 
         List.Visible = State.Open or List.Size.Y.Offset > 0;
@@ -524,29 +484,6 @@ local function MakeDropdown( Parent, Options, Default, Callback )
     Trigger.MouseButton1Click : Connect( function()
         State.Open = not State.Open;
         Refresh();
-    end );
-
-    UserInputService.InputBegan : Connect( function( Input )
-        if ( not State.Open ) then
-            return;
-        end;
-
-        if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then
-            return;
-        end;
-
-        const Mouse = UserInputService : GetMouseLocation();
-        const ListPos = List.AbsolutePosition;
-        const ListSize = List.AbsoluteSize;
-
-        local HitX = Mouse.X >= ListPos.X and Mouse.X <= ListPos.X + ListSize.X;
-        local HitY = ( Mouse.Y >= ListPos.Y - 20 and Mouse.Y <= ListPos.Y + ListSize.Y )
-                  or ( Mouse.Y + 36 >= ListPos.Y - 20 and Mouse.Y + 36 <= ListPos.Y + ListSize.Y );
-
-        if not ( HitX and HitY ) then
-            State.Open = false;
-            Refresh();
-        end;
     end );
 
     Refresh();
@@ -558,78 +495,19 @@ local function MakeDropdown( Parent, Options, Default, Callback )
     };
 end;
 
-local function MakeKeyBind( Parent, LabelText )
-    local State = { Pressed = false };
-
-    const Button = Create( "TextButton", {
-        BackgroundColor3 = Color3FromRGB( 44, 44, 44 );
-        BorderSizePixel = 0;
-        Size = UDim2FromOffset( 24, 16 );
-        Text = LabelText;
-        TextColor3 = Color3FromRGB( 192, 192, 192 );
-        TextSize = 10;
-        Font = FONT_BOLD;
-        AutoButtonColor = false;
-        Parent = Parent;
-    } );
-    ApplyCorner( Button, 2 );
-    ApplyGradient( Button, {
-        { 0, Color3FromRGB( 44, 44, 44 ) };
-        { 1, Color3FromRGB( 32, 32, 32 ) };
-    }, 90 );
-    const StrokeRef = ApplyStroke( Button, Color3FromRGB( 74, 74, 74 ), 1, 0 );
-
-    local function Refresh()
-        if ( State.Pressed ) then
-            Button.TextColor3 = Color3New( 1, 1, 1 );
-            StrokeRef.Color = ACCENT;
-            Button.BackgroundColor3 = Color3FromRGB( 36, 36, 36 );
-        else
-            Button.TextColor3 = Color3FromRGB( 192, 192, 192 );
-            StrokeRef.Color = Color3FromRGB( 74, 74, 74 );
-            Button.BackgroundColor3 = Color3FromRGB( 44, 44, 44 );
-        end;
-    end;
-
-    Button.MouseButton1Down : Connect( function() State.Pressed = true; Refresh(); end );
-    Button.MouseButton1Up   : Connect( function() State.Pressed = false; Refresh(); end );
-    Button.MouseLeave       : Connect( function() State.Pressed = false; Refresh(); end );
-
-    Refresh();
-
-    return Button;
-end;
-
-local function MakeColorSwatch( Parent, ColorA, ColorB, BorderColor )
-    const Swatch = Create( "Frame", {
-        BackgroundColor3 = ColorA;
-        BorderSizePixel = 0;
-        Size = UDim2FromOffset( 20, 13 );
-        Parent = Parent;
-    } );
-    ApplyCorner( Swatch, 2 );
-    ApplyGradient( Swatch, {
-        { 0, ColorA };
-        { 1, ColorB };
-    }, 90 );
-    ApplyStroke( Swatch, BorderColor, 1, 0 );
-
-    return Swatch;
-end;
-
 local function MakeDivider( Parent )
-    const Divider = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 44, 44, 44 );
+    local Divider = Create( "Frame", {
+        BackgroundColor3 = RGB( 44, 44, 44 );
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 1 );
+        Size = UDim2.new( 1, 0, 0, 1 );
         Parent = Parent;
     } );
-    ApplyGradient( Divider, {
-        { 0, Color3FromRGB( 22, 22, 22 ) };
-        { 0.2, Color3FromRGB( 44, 44, 44 ) };
-        { 0.5, Color3FromRGB( 56, 56, 56 ) };
-        { 0.8, Color3FromRGB( 44, 44, 44 ) };
-        { 1, Color3FromRGB( 22, 22, 22 ) };
+    Gradient( Divider, {
+        { 0, RGB( 22, 22, 22 ) };
+        { 0.2, RGB( 44, 44, 44 ) };
+        { 0.5, RGB( 56, 56, 56 ) };
+        { 0.8, RGB( 44, 44, 44 ) };
+        { 1, RGB( 22, 22, 22 ) };
     }, 0 );
 
     return Divider;
@@ -638,9 +516,9 @@ end;
 local function MakeSectionLabel( Parent, Text )
     return Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 0, 12 );
+        Size = UDim2.new( 1, 0, 0, 12 );
         Text = string.upper( Text );
-        TextColor3 = Color3FromRGB( 120, 120, 120 );
+        TextColor3 = RGB( 120, 120, 120 );
         TextSize = 10;
         Font = FONT;
         TextXAlignment = Enum.TextXAlignment.Left;
@@ -649,29 +527,29 @@ local function MakeSectionLabel( Parent, Text )
 end;
 
 local function MakePanelHeading( Parent, Text )
-    const Container = Create( "Frame", {
+    local Container = Create( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 0, 16 );
+        Size = UDim2.new( 1, 0, 0, 16 );
         Parent = Parent;
     } );
 
-    const AccentBar = Create( "Frame", {
+    local Bar = Create( "Frame", {
         BackgroundColor3 = ACCENT_BRIGHT;
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 0, 2 );
-        Size = UDim2FromOffset( 3, 11 );
+        Position = Off2( 0, 2 );
+        Size = Off2( 3, 11 );
         Parent = Container;
     } );
-    ApplyCorner( AccentBar, 1 );
-    ApplyGradient( AccentBar, {
+    Corner( Bar, 1 );
+    Gradient( Bar, {
         { 0, ACCENT_BRIGHT };
         { 1, ACCENT_DIM };
     }, 90 );
 
     Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 8, 0 );
-        Size = UDim2New( 1, -8, 1, 0 );
+        Position = Off2( 8, 0 );
+        Size = UDim2.new( 1, -8, 1, 0 );
         Text = Text;
         TextColor3 = TEXT_PRIMARY;
         TextSize = 11;
@@ -686,19 +564,28 @@ end;
 local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
     local State = { Active = false, Hovered = false };
 
-    const Tab = Create( "TextButton", {
-        BackgroundColor3 = Color3FromRGB( 28, 28, 28 );
+    local Tab = Create( "TextButton", {
         BorderSizePixel = 0;
-        Size = UDim2FromOffset( 60, Small and 22 or 24 );
+        Size = Off2( 60, Small and 22 or 24 );
         Text = "";
         AutoButtonColor = false;
         LayoutOrder = LayoutOrder or 0;
         Parent = Parent;
     } );
 
-    const Label = Create( "TextLabel", {
+    local Fill = Create( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2New( 1, 0, 1, 0 );
+        Size = UDim2.new( 1, 0, 1, 0 );
+        Parent = Tab;
+    } );
+    local FillGrad = Gradient( Fill, {
+        { 0, RGB( 28, 28, 28 ) };
+        { 1, RGB( 20, 20, 20 ) };
+    }, 90 );
+
+    local Label = Create( "TextLabel", {
+        BackgroundTransparency = 1;
+        Size = UDim2.new( 1, 0, 1, 0 );
         Text = Text;
         TextColor3 = TEXT_MUTED;
         TextSize = Small and 10 or 11;
@@ -706,51 +593,75 @@ local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
         Parent = Tab;
     } );
 
-    const TopBorder = Create( "Frame", {
+    local TopBorder = Create( "Frame", {
         BackgroundColor3 = BORDER_FAINT;
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 1 );
+        Size = UDim2.new( 1, 0, 0, 1 );
         Parent = Tab;
     } );
 
-    local function Measure()
-        local Padding = Small and 18 or 24;
-        Tab.Size = UDim2FromOffset( Label.TextBounds.X + Padding, Small and 22 or 24 );
-    end;
+    -- The bottom "connect" tail — when active, this 1px frame reaches below
+    -- the tab and covers the panel divider, matching marginBottom: -1 in TSX.
+    local Tail = Create( "Frame", {
+        BackgroundColor3 = RGB( 32, 32, 32 );
+        BorderSizePixel = 0;
+        Position = UDim2.new( 0, 0, 1, 0 );
+        Size = UDim2.new( 1, 0, 0, 1 );
+        Visible = false;
+        ZIndex = 5;
+        Parent = Tab;
+    } );
 
     local function Refresh()
+        local Padding = Small and 18 or 24;
+        Tab.Size = Off2( Label.TextBounds.X + Padding, Small and 22 or 24 );
+
         if ( State.Active ) then
-            Tab.BackgroundColor3 = Color3FromRGB( 32, 32, 32 );
-            Label.TextColor3 = Color3FromRGB( 224, 224, 224 );
+            Fill.BackgroundTransparency = 1;
+            FillGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 42, 42, 42 ) );
+                ColorSequenceKeypoint.new( 0.6, RGB( 32, 32, 32 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 28, 28, 28 ) );
+            } );
+            Label.TextColor3 = RGB( 224, 224, 224 );
             Label.Font = FONT_BOLD;
             TopBorder.BackgroundColor3 = ACCENT;
+            Tail.Visible = true;
+            Tab.ZIndex = 3;
         elseif ( State.Hovered ) then
-            Tab.BackgroundColor3 = Color3FromRGB( 34, 34, 34 );
+            Fill.BackgroundTransparency = 0;
+            FillGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 34, 34, 34 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 26, 26, 26 ) );
+            } );
             Label.TextColor3 = TEXT_HOVER;
             Label.Font = FONT;
-            TopBorder.BackgroundColor3 = Color3FromRGB( 64, 64, 64 );
+            TopBorder.BackgroundColor3 = RGB( 64, 64, 64 );
+            Tail.Visible = false;
+            Tab.ZIndex = 1;
         else
-            Tab.BackgroundColor3 = Color3FromRGB( 28, 28, 28 );
+            Fill.BackgroundTransparency = 0;
+            FillGrad.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, RGB( 28, 28, 28 ) );
+                ColorSequenceKeypoint.new( 1, RGB( 20, 20, 20 ) );
+            } );
             Label.TextColor3 = TEXT_MUTED;
             Label.Font = FONT;
             TopBorder.BackgroundColor3 = BORDER_FAINT;
+            Tail.Visible = false;
+            Tab.ZIndex = 1;
         end;
-
-        Measure();
     end;
 
     Tab.MouseButton1Click : Connect( function()
-        if ( OnClick ) then
-            OnClick();
-        end;
+        if ( OnClick ) then OnClick(); end;
     end );
 
     Tab.MouseEnter : Connect( function() State.Hovered = true; Refresh(); end );
     Tab.MouseLeave : Connect( function() State.Hovered = false; Refresh(); end );
 
     Refresh();
-
-    task.defer( Measure );
+    task.defer( Refresh );
 
     return {
         Tab = Tab;
@@ -758,12 +669,12 @@ local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
     };
 end;
 
--- ── Page (wraps a Frame, exposes atom constructors) ─────────────────────────
+-- ── Page (wrapper around a Frame) ────────────────────────────────────────────
 
 local Page = { };
 Page.__index = Page;
 
-function Page.new( Frame )
+local function NewPage( Frame )
     return setmetatable( { Frame = Frame }, Page );
 end;
 
@@ -777,14 +688,6 @@ end;
 
 function Page : Dropdown( Options, Default, Callback )
     return MakeDropdown( self.Frame, Options, Default, Callback );
-end;
-
-function Page : KeyBind( Label )
-    return MakeKeyBind( self.Frame, Label );
-end;
-
-function Page : ColorSwatch( ColorA, ColorB, BorderColor )
-    return MakeColorSwatch( self.Frame, ColorA, ColorB, BorderColor );
 end;
 
 function Page : Divider()
@@ -803,7 +706,7 @@ Interface.__index = Interface;
 function Interface.new( Title )
     Title = Title or "juanita****.club";
 
-    const ScreenGui = Create( "ScreenGui", {
+    local ScreenGui = Create( "ScreenGui", {
         Name = "juanita_club";
         ResetOnSpawn = false;
         IgnoreGuiInset = true;
@@ -811,73 +714,56 @@ function Interface.new( Title )
         Parent = CoreGui;
     } );
 
-    const Window = Create( "Frame", {
+    -- Window
+    local Window = Create( "Frame", {
         BackgroundColor3 = BG_WINDOW;
         BorderSizePixel = 0;
-        AnchorPoint = Vector2New( 0.5, 0.5 );
-        Position = UDim2New( 0.5, 0, 0.5, 0 );
-        Size = UDim2FromOffset( 420, 380 );
+        AnchorPoint = Vector2.new( 0.5, 0.5 );
+        Position = UDim2.new( 0.5, 0, 0.5, 0 );
+        Size = Off2( 420, 380 );
         ClipsDescendants = true;
         Parent = ScreenGui;
     } );
-    ApplyCorner( Window, 4 );
-    ApplyStroke( Window, BORDER_EDGE, 1, 0 );
-
-    const GlowRing = Create( "Frame", {
-        BackgroundTransparency = 1;
-        Size = Window.Size;
-        Position = Window.Position;
-        ZIndex = 0;
-        Parent = ScreenGui;
-    } );
-    ApplyStroke( GlowRing, ACCENT, 1, 0.93 );
-    ApplyCorner( GlowRing, 4 );
-
-    Create( "UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = UDimFromOffset( 0 );
-        Parent = Window;
-    } );
+    Corner( Window, 4 );
+    Stroke( Window, BORDER_EDGE );
 
     -- Title bar
-    const TitleBar = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 34, 34, 34 );
+    local TitleBar = Create( "Frame", {
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 26 );
-        LayoutOrder = 1;
+        Size = UDim2.new( 1, 0, 0, 26 );
         Parent = Window;
     } );
-    ApplyGradient( TitleBar, {
-        { 0, Color3FromRGB( 42, 42, 42 ) };
-        { 0.5, Color3FromRGB( 31, 31, 31 ) };
-        { 1, Color3FromRGB( 26, 26, 26 ) };
+    Gradient( TitleBar, {
+        { 0, RGB( 42, 42, 42 ) };
+        { 0.5, RGB( 31, 31, 31 ) };
+        { 1, RGB( 26, 26, 26 ) };
     }, 90 );
 
     Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 10, 10, 10 );
+        BackgroundColor3 = RGB( 10, 10, 10 );
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 1 );
-        Position = UDim2New( 0, 0, 1, -1 );
+        Size = UDim2.new( 1, 0, 0, 1 );
+        Position = UDim2.new( 0, 0, 1, -1 );
         Parent = TitleBar;
     } );
 
-    const BrandMark = Create( "Frame", {
+    local BrandMark = Create( "Frame", {
         BackgroundColor3 = ACCENT_BRIGHT;
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 10, 7 );
-        Size = UDim2FromOffset( 10, 12 );
+        Position = Off2( 10, 7 );
+        Size = Off2( 10, 12 );
         Parent = TitleBar;
     } );
-    ApplyCorner( BrandMark, 2 );
-    ApplyGradient( BrandMark, {
+    Corner( BrandMark, 2 );
+    Gradient( BrandMark, {
         { 0, ACCENT_BRIGHT };
         { 1, ACCENT_DIM };
     }, 90 );
 
     Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 24, 0 );
-        Size = UDim2New( 1, -90, 1, 0 );
+        Position = Off2( 24, 0 );
+        Size = UDim2.new( 1, -90, 1, 0 );
         Text = Title;
         TextColor3 = TEXT_PRIMARY;
         TextSize = 11;
@@ -886,157 +772,178 @@ function Interface.new( Title )
         Parent = TitleBar;
     } );
 
-    const TitleButtons = Create( "Frame", {
+    local TitleButtons = Create( "Frame", {
         BackgroundTransparency = 1;
-        Position = UDim2New( 1, -42, 0, 6 );
-        Size = UDim2FromOffset( 38, 14 );
+        Position = UDim2.new( 1, -42, 0, 6 );
+        Size = Off2( 38, 14 );
         Parent = TitleBar;
     } );
 
-    const MinBtn = Create( "TextButton", {
-        BackgroundColor3 = Color3FromRGB( 46, 46, 46 );
+    local MinBtn = Create( "TextButton", {
+        BackgroundColor3 = RGB( 46, 46, 46 );
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 0, 0 );
-        Size = UDim2FromOffset( 18, 14 );
+        Size = Off2( 18, 14 );
         Text = "-";
-        TextColor3 = Color3FromRGB( 144, 144, 144 );
+        TextColor3 = RGB( 144, 144, 144 );
         TextSize = 11;
         Font = FONT;
         AutoButtonColor = false;
         Parent = TitleButtons;
     } );
-    ApplyCorner( MinBtn, 2 );
-    ApplyStroke( MinBtn, Color3FromRGB( 72, 72, 72 ), 1, 0 );
+    Corner( MinBtn, 2 );
+    Stroke( MinBtn, RGB( 72, 72, 72 ) );
 
-    const CloseBtn = Create( "TextButton", {
-        BackgroundColor3 = Color3FromRGB( 146, 32, 32 );
+    local CloseBtn = Create( "TextButton", {
+        BackgroundColor3 = RGB( 146, 32, 32 );
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( 21, 0 );
-        Size = UDim2FromOffset( 18, 14 );
+        Position = Off2( 21, 0 );
+        Size = Off2( 18, 14 );
         Text = "x";
-        TextColor3 = Color3FromRGB( 238, 238, 238 );
+        TextColor3 = RGB( 238, 238, 238 );
         TextSize = 10;
         Font = FONT;
         AutoButtonColor = false;
         Parent = TitleButtons;
     } );
-    ApplyCorner( CloseBtn, 2 );
-    ApplyStroke( CloseBtn, Color3FromRGB( 106, 16, 16 ), 1, 0 );
+    Corner( CloseBtn, 2 );
+    Stroke( CloseBtn, RGB( 106, 16, 16 ) );
 
     -- Main tab strip
-    const TabStrip = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 22, 22, 22 );
+    local TabStrip = Create( "Frame", {
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 28 );
-        LayoutOrder = 2;
+        Position = Off2( 0, 26 );
+        Size = UDim2.new( 1, 0, 0, 28 );
         Parent = Window;
     } );
-    ApplyGradient( TabStrip, {
-        { 0, Color3FromRGB( 22, 22, 22 ) };
-        { 1, Color3FromRGB( 18, 18, 18 ) };
+    Gradient( TabStrip, {
+        { 0, RGB( 22, 22, 22 ) };
+        { 1, RGB( 18, 18, 18 ) };
     }, 90 );
 
-    Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 46, 46, 46 );
+    -- The border that active tabs "merge" into
+    local StripBorder = Create( "Frame", {
+        BackgroundColor3 = RGB( 46, 46, 46 );
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 1 );
-        Position = UDim2New( 0, 0, 1, -1 );
+        Size = UDim2.new( 1, 0, 0, 1 );
+        Position = UDim2.new( 0, 0, 1, -1 );
         Parent = TabStrip;
     } );
 
-    const TabHolder = Create( "Frame", {
+    local TabHolder = Create( "Frame", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 6, 4 );
-        Size = UDim2New( 1, -12, 1, -4 );
+        Position = Off2( 6, 4 );
+        Size = UDim2.new( 1, -12, 1, -4 );
         Parent = TabStrip;
     } );
 
     Create( "UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal;
         SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = UDimFromOffset( 2 );
+        Padding = Off( 2 );
         VerticalAlignment = Enum.VerticalAlignment.Bottom;
         Parent = TabHolder;
     } );
 
     -- Body
-    const Body = Create( "Frame", {
+    local Body = Create( "Frame", {
         BackgroundColor3 = BG_WINDOW;
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 300 );
-        LayoutOrder = 3;
+        Position = Off2( 0, 54 );
+        Size = UDim2.new( 1, 0, 0, 300 );
         Parent = Window;
     } );
 
-    const LeftPanel = Create( "Frame", {
+    local LeftPanel = Create( "Frame", {
         BackgroundColor3 = BG_WINDOW;
         BorderSizePixel = 0;
-        Size = UDim2FromOffset( PANEL_WIDTH, 300 );
+        Size = Off2( PANEL_WIDTH, 300 );
         Parent = Body;
     } );
 
-    const LeftInner = Create( "Frame", {
+    local LeftInner = Create( "Frame", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 12, 10 );
-        Size = UDim2FromOffset( PANEL_WIDTH - 24, 0 );
+        Position = Off2( 12, 10 );
+        Size = Off2( PANEL_WIDTH - 24, 0 );
         AutomaticSize = Enum.AutomaticSize.Y;
         Parent = LeftPanel;
     } );
 
     Create( "UIListLayout", {
         SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = UDimFromOffset( 0 );
+        Padding = Off( 0 );
         Parent = LeftInner;
     } );
 
-    const PanelDivider = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 32, 32, 32 );
+    Create( "Frame", {
+        BackgroundColor3 = RGB( 32, 32, 32 );
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( PANEL_WIDTH, 0 );
-        Size = UDim2FromOffset( 1, 300 );
+        Position = Off2( PANEL_WIDTH, 0 );
+        Size = Off2( 1, 300 );
         Parent = Body;
     } );
 
-    const RightPanel = Create( "Frame", {
+    local RightPanel = Create( "Frame", {
         BackgroundColor3 = BG_WINDOW;
         BorderSizePixel = 0;
-        Position = UDim2FromOffset( PANEL_WIDTH + 1, 0 );
-        Size = UDim2FromOffset( RIGHT_WIDTH, 300 );
+        Position = Off2( PANEL_WIDTH + 1, 0 );
+        Size = Off2( RIGHT_WIDTH, 300 );
         Parent = Body;
     } );
 
-    const RightInner = Create( "Frame", {
+    local RightInner = Create( "Frame", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 10, 8 );
-        Size = UDim2FromOffset( RIGHT_WIDTH - 20, 0 );
+        Position = Off2( 10, 8 );
+        Size = Off2( RIGHT_WIDTH - 20, 0 );
         AutomaticSize = Enum.AutomaticSize.Y;
         Parent = RightPanel;
     } );
 
-    -- Footer
-    const Footer = Create( "Frame", {
-        BackgroundColor3 = BG_FOOTER;
+    -- Right sub-tab strip
+    local RightStrip = Create( "Frame", {
+        BackgroundTransparency = 1;
+        Size = Off2( RIGHT_WIDTH - 20, 22 );
+        Parent = RightInner;
+    } );
+
+    Create( "Frame", {
+        BackgroundColor3 = RGB( 46, 46, 46 );
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 20 );
-        LayoutOrder = 4;
+        Size = UDim2.new( 1, 0, 0, 1 );
+        Position = UDim2.new( 0, 0, 1, -1 );
+        Parent = RightStrip;
+    } );
+
+    Create( "UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal;
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Padding = Off( 1 );
+        VerticalAlignment = Enum.VerticalAlignment.Bottom;
+        Parent = RightStrip;
+    } );
+
+    -- Footer
+    local Footer = Create( "Frame", {
+        BorderSizePixel = 0;
+        Position = UDim2.new( 0, 0, 1, -20 );
+        Size = UDim2.new( 1, 0, 0, 20 );
         Parent = Window;
     } );
-    ApplyGradient( Footer, {
-        { 0, Color3FromRGB( 18, 18, 18 ) };
-        { 1, Color3FromRGB( 14, 14, 14 ) };
+    Gradient( Footer, {
+        { 0, RGB( 18, 18, 18 ) };
+        { 1, RGB( 14, 14, 14 ) };
     }, 90 );
 
     Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 30, 30, 30 );
+        BackgroundColor3 = RGB( 30, 30, 30 );
         BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 1 );
+        Size = UDim2.new( 1, 0, 0, 1 );
         Parent = Footer;
     } );
 
     Create( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 10, 0 );
-        Size = UDim2New( 1, -20, 1, 0 );
+        Position = Off2( 10, 0 );
+        Size = UDim2.new( 1, -20, 1, 0 );
         Text = "build 2.4.1";
         TextColor3 = TEXT_FAINT;
         TextSize = 9;
@@ -1045,21 +952,21 @@ function Interface.new( Title )
         Parent = Footer;
     } );
 
-    const StatusDot = Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 46, 204, 85 );
+    local StatusDot = Create( "Frame", {
+        BackgroundColor3 = RGB( 46, 204, 85 );
         BorderSizePixel = 0;
-        AnchorPoint = Vector2New( 1, 0.5 );
-        Position = UDim2New( 1, -50, 0.5, 0 );
-        Size = UDim2FromOffset( 5, 5 );
+        AnchorPoint = Vector2.new( 1, 0.5 );
+        Position = UDim2.new( 1, -50, 0.5, 0 );
+        Size = Off2( 5, 5 );
         Parent = Footer;
     } );
-    ApplyCorner( StatusDot, 100 );
+    Corner( StatusDot, 100 );
 
     Create( "TextLabel", {
         BackgroundTransparency = 1;
-        AnchorPoint = Vector2New( 1, 0.5 );
-        Position = UDim2New( 1, -10, 0.5, 0 );
-        Size = UDim2FromOffset( 36, 12 );
+        AnchorPoint = Vector2.new( 1, 0.5 );
+        Position = UDim2.new( 1, -10, 0.5, 0 );
+        Size = Off2( 36, 12 );
         Text = "CONNECTED";
         TextColor3 = TEXT_FAINT;
         TextSize = 9;
@@ -1069,92 +976,50 @@ function Interface.new( Title )
     } );
 
     -- Drag
-    local Drag = { Active = false; StartMouse = Vector2New( 0, 0 ); StartPos = UDim2New( 0, 0, 0, 0 ) };
+    local Dragging = false;
+    local DragStartMouse = Vector2.new( 0, 0 );
+    local DragStartPos = UDim2.new( 0, 0, 0, 0 );
 
     TitleBar.InputBegan : Connect( function( Input )
-        if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then
-            return;
-        end;
+        if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then return; end;
 
-        Drag.Active = true;
-        Drag.StartMouse = Vector2New( Input.Position.X, Input.Position.Y );
-        Drag.StartPos = Window.Position;
+        Dragging = true;
+        DragStartMouse = Vector2.new( Input.Position.X, Input.Position.Y );
+        DragStartPos = Window.Position;
     end );
 
     UserInputService.InputChanged : Connect( function( Input )
-        if ( not Drag.Active ) then return; end;
+        if ( not Dragging ) then return; end;
         if ( Input.UserInputType ~= Enum.UserInputType.MouseMovement ) then return; end;
 
-        const DeltaX = Input.Position.X - Drag.StartMouse.X;
-        const DeltaY = Input.Position.Y - Drag.StartMouse.Y;
-
-        Window.Position = UDim2New(
-            Drag.StartPos.X.Scale, Drag.StartPos.X.Offset + DeltaX,
-            Drag.StartPos.Y.Scale, Drag.StartPos.Y.Offset + DeltaY
+        Window.Position = UDim2.new(
+            DragStartPos.X.Scale, DragStartPos.X.Offset + ( Input.Position.X - DragStartMouse.X ),
+            DragStartPos.Y.Scale, DragStartPos.Y.Offset + ( Input.Position.Y - DragStartMouse.Y )
         );
-
-        GlowRing.Position = Window.Position;
-        GlowRing.Size = Window.Size;
     end );
 
     UserInputService.InputEnded : Connect( function( Input )
         if ( Input.UserInputType == Enum.UserInputType.MouseButton1 ) then
-            Drag.Active = false;
+            Dragging = false;
         end;
     end );
 
-    CloseBtn.MouseButton1Click : Connect( function()
-        ScreenGui : Destroy();
-    end );
+    CloseBtn.MouseButton1Click : Connect( function() ScreenGui : Destroy(); end );
+    MinBtn.MouseButton1Click : Connect( function() Window.Visible = not Window.Visible; end );
 
-    MinBtn.MouseButton1Click : Connect( function()
-        Window.Visible = not Window.Visible;
-    end );
+    -- Tab state
+    local LeftPages = { };
+    local LeftTabs = { };
+    local RightPages = { };
+    local RightTabs = { };
 
-    -- Right sub-tab strip
-    const RightStrip = Create( "Frame", {
-        BackgroundTransparency = 1;
-        Position = UDim2FromOffset( 0, 0 );
-        Size = UDim2FromOffset( RIGHT_WIDTH - 20, 22 );
-        Parent = RightInner;
-    } );
-
-    Create( "Frame", {
-        BackgroundColor3 = Color3FromRGB( 46, 46, 46 );
-        BorderSizePixel = 0;
-        Size = UDim2New( 1, 0, 0, 1 );
-        Position = UDim2New( 0, 0, 1, -1 );
-        Parent = RightStrip;
-    } );
-
-    Create( "UIListLayout", {
-        FillDirection = Enum.FillDirection.Horizontal;
-        SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = UDimFromOffset( 1 );
-        VerticalAlignment = Enum.VerticalAlignment.Bottom;
-        Parent = RightStrip;
-    } );
-
-    -- State
-    const LeftPages = { };
-    const LeftTabs = { };
-    const RightPages = { };
-    const RightTabs = { };
-
-    const API = setmetatable( {
+    local API = setmetatable( {
         ScreenGui = ScreenGui;
         Window = Window;
-        TabHolder = TabHolder;
         RightStrip = RightStrip;
-        LeftInner = LeftInner;
-        RightInner = RightInner;
         LeftPages = LeftPages;
         RightPages = RightPages;
-        LeftTabs = LeftTabs;
-        RightTabs = RightTabs;
         Heading = nil;
-        ActiveLeftTab = nil;
-        ActiveRightTab = nil;
     }, Interface );
 
     function API : AddLeftTab( Name )
@@ -1162,9 +1027,9 @@ function Interface.new( Title )
             return LeftPages[ Name ];
         end;
 
-        const Frame = Create( "Frame", {
+        local Frame = Create( "Frame", {
             BackgroundTransparency = 1;
-            Size = UDim2FromOffset( PANEL_WIDTH - 24, 0 );
+            Size = Off2( PANEL_WIDTH - 24, 0 );
             AutomaticSize = Enum.AutomaticSize.Y;
             LayoutOrder = 1;
             Visible = false;
@@ -1173,16 +1038,15 @@ function Interface.new( Title )
 
         Create( "UIListLayout", {
             SortOrder = Enum.SortOrder.LayoutOrder;
-            Padding = UDimFromOffset( 5 );
+            Padding = Off( 5 );
             Parent = Frame;
         } );
 
-        const TabAPI = MakeTab( TabHolder, Name, false, #LeftPages + 1, function()
+        local TabAPI = MakeTab( TabHolder, Name, false, #LeftPages + 1, function()
             API : SelectLeftTab( Name );
         end );
 
-        const Wrapped = Page.new( Frame );
-
+        local Wrapped = NewPage( Frame );
         LeftPages[ Name ] = Wrapped;
         LeftTabs[ Name ] = TabAPI;
 
@@ -1198,21 +1062,19 @@ function Interface.new( Title )
             TabAPI : SetActive( TabName == Name );
         end;
 
-        API.ActiveLeftTab = Name;
-
         if ( API.Heading ) then
             API.Heading : Destroy();
         end;
 
-        const Holder = Create( "Frame", {
+        local Holder = Create( "Frame", {
             BackgroundTransparency = 1;
-            Size = UDim2New( 1, 0, 0, 22 );
+            Size = UDim2.new( 1, 0, 0, 22 );
             LayoutOrder = 0;
             Parent = LeftInner;
         } );
 
         API.Heading = MakePanelHeading( Holder, Name );
-        API.Heading.Size = UDim2New( 1, 0, 1, 0 );
+        API.Heading.Size = UDim2.new( 1, 0, 1, 0 );
     end;
 
     function API : AddRightTab( Name )
@@ -1220,10 +1082,10 @@ function Interface.new( Title )
             return RightPages[ Name ];
         end;
 
-        const Frame = Create( "Frame", {
+        local Frame = Create( "Frame", {
             BackgroundTransparency = 1;
-            Position = UDim2FromOffset( 0, 30 );
-            Size = UDim2FromOffset( RIGHT_WIDTH - 20, 0 );
+            Position = Off2( 0, 30 );
+            Size = Off2( RIGHT_WIDTH - 20, 0 );
             AutomaticSize = Enum.AutomaticSize.Y;
             Visible = false;
             Parent = RightInner;
@@ -1231,14 +1093,17 @@ function Interface.new( Title )
 
         Create( "UIListLayout", {
             SortOrder = Enum.SortOrder.LayoutOrder;
-            Padding = UDimFromOffset( 5 );
+            Padding = Off( 5 );
             Parent = Frame;
         } );
 
-        const Wrapped = Page.new( Frame );
+        local TabAPI = MakeTab( RightStrip, Name, true, #RightPages + 1, function()
+            API : SelectRightTab( Name );
+        end );
 
+        local Wrapped = NewPage( Frame );
         RightPages[ Name ] = Wrapped;
-        RightTabs[ Name ] = Wrapped;
+        RightTabs[ Name ] = TabAPI;
 
         return Wrapped;
     end;
@@ -1247,10 +1112,13 @@ function Interface.new( Title )
         for TabName, Wrapped in pairs( RightPages ) do
             Wrapped.Frame.Visible = ( TabName == Name );
         end;
-        API.ActiveRightTab = Name;
+
+        for TabName, TabAPI in pairs( RightTabs ) do
+            TabAPI : SetActive( TabName == Name );
+        end;
     end;
 
-    -- Resize window to fit content
+    -- Fit window to tallest tab
     task.defer( function()
         task.wait( 0.1 );
 
@@ -1264,14 +1132,11 @@ function Interface.new( Title )
             MaxHeight = math.max( MaxHeight, Wrapped.Frame.AbsoluteSize.Y + 60 );
         end;
 
-        Body.Size = UDim2New( 1, 0, 0, MaxHeight );
-        LeftPanel.Size = UDim2FromOffset( PANEL_WIDTH, MaxHeight );
-        PanelDivider.Size = UDim2FromOffset( 1, MaxHeight );
-        RightPanel.Size = UDim2FromOffset( RIGHT_WIDTH, MaxHeight );
+        Body.Size = UDim2.new( 1, 0, 0, MaxHeight );
+        LeftPanel.Size = Off2( PANEL_WIDTH, MaxHeight );
+        RightPanel.Size = Off2( RIGHT_WIDTH, MaxHeight );
 
-        Window.Size = UDim2FromOffset( 420, 26 + 28 + MaxHeight + 20 );
-        GlowRing.Size = Window.Size;
-        GlowRing.Position = Window.Position;
+        Window.Size = Off2( 420, 26 + 28 + MaxHeight + 20 );
     end );
 
     return API;
