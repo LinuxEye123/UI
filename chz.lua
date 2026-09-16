@@ -1,704 +1,574 @@
---[[
-    juanita****.club — Ported from App.tsx / index.css
-
-    Every UDim / UDim2 constructor is called directly (no cached aliases)
-    so this cannot hit `attempt to call a nil value`.
-]]
+--[[ juanita****.club — Port of App.tsx / index.css ]]
 
 local Game = game;
+local UIS  = Game : GetService( "UserInputService" );
+local Tw   = Game : GetService( "TweenService" );
+local CG   = Game : GetService( "CoreGui" );
 
-local UserInputService = Game : GetService( "UserInputService" );
-local TweenService      = Game : GetService( "TweenService" );
-local CoreGui           = Game : GetService( "CoreGui" );
+-- Palette
+local ACCENT        = Color3.fromRGB( 212, 90, 16 );
+local ACCENT_BRIGHT = Color3.fromRGB( 232, 112, 26 );
+local ACCENT_DIM    = Color3.fromRGB( 154, 60, 8 );
 
--- ── Small helpers that call constructors directly ────────────────────────────
+local TX_DEFAULT  = Color3.fromRGB( 160, 160, 160 );
+local TX_HOVER    = Color3.fromRGB( 184, 184, 184 );
+local TX_ACTIVE   = Color3.fromRGB( 216, 216, 216 );
+local TX_PRIMARY  = Color3.fromRGB( 200, 200, 200 );
+local TX_MUTED    = Color3.fromRGB( 112, 112, 112 );
+local TX_FAINT    = Color3.fromRGB( 62, 62, 62 );
 
-local function Off( N )
-    return UDim.new( 0, N );
+local BG_WIN    = Color3.fromRGB( 22, 22, 22 );
+local BG_FOOT   = Color3.fromRGB( 14, 14, 14 );
+
+local B_SOFT   = Color3.fromRGB( 54, 54, 54 );
+local B_HOVER  = Color3.fromRGB( 74, 74, 74 );
+local B_FAINT  = Color3.fromRGB( 40, 40, 40 );
+local B_EDGE   = Color3.fromRGB( 13, 13, 13 );
+
+local FT   = Enum.Font.Gotham;
+local FTM  = Enum.Font.GothamMedium;
+local FTB  = Enum.Font.GothamBold;
+
+local PANEL_W = 200;
+local RIGHT_W = 180;
+
+local function O( N ) return UDim.new( 0, N ); end;
+local function O2( X, Y ) return UDim2.new( 0, X or 0, 0, Y or 0 ); end;
+
+local function C( Class, Props )
+    local I = Instance.new( Class );
+    for K, V in pairs( Props ) do I[ K ] = V; end;
+    return I;
 end;
 
-local function Off2( X, Y )
-    return UDim2.new( 0, X or 0, 0, Y or 0 );
-end;
-
-local function Create( Class, Properties )
-    local Object = Instance.new( Class );
-
-    for Property, Value in pairs( Properties ) do
-        Object[ Property ] = Value;
+local function GR( Obj, Stops, Rot )
+    local Pts = { };
+    for i, S in ipairs( Stops ) do
+        Pts[ i ] = ColorSequenceKeypoint.new( S[ 1 ], S[ 2 ] );
     end;
-
-    return Object;
-end;
-
-local function RGB( R, G, B )
-    return Color3.fromRGB( R, G, B );
-end;
-
-local function Gradient( Object, Stops, Rotation )
-    local Points = { };
-
-    for Index, Stop in ipairs( Stops ) do
-        Points[ Index ] = ColorSequenceKeypoint.new( Stop[ 1 ], Stop[ 2 ] );
-    end;
-
-    return Create( "UIGradient", {
-        Color = ColorSequence.new( Points );
-        Rotation = Rotation or 90;
-        Parent = Object;
+    return C( "UIGradient", {
+        Color = ColorSequence.new( Pts );
+        Rotation = Rot or 90;
+        Parent = Obj;
     } );
 end;
 
-local function Corner( Object, Radius )
-    return Create( "UICorner", {
-        CornerRadius = UDim.new( 0, Radius );
-        Parent = Object;
-    } );
+local function CR( Obj, R )
+    return C( "UICorner", { CornerRadius = UDim.new( 0, R ); Parent = Obj; } );
 end;
 
-local function Stroke( Object, Color, Transparency )
-    return Create( "UIStroke", {
-        Color = Color;
+local function ST( Obj, Clr, T )
+    return C( "UIStroke", {
+        Color = Clr;
         Thickness = 1;
-        Transparency = Transparency or 0;
+        Transparency = T or 0;
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-        Parent = Object;
+        Parent = Obj;
     } );
 end;
 
--- ── Palette (matches ACCENT / ACCENT_BRIGHT / ACCENT_DIM from App.tsx) ───────
+-- ── Atoms ───────────────────────────────────────────────────────────────────
 
-local ACCENT        = RGB( 212, 90, 16 );
-local ACCENT_BRIGHT = RGB( 232, 112, 26 );
-local ACCENT_DIM    = RGB( 154, 60, 8 );
+local function Checkbox( Parent, Text, Def, CB )
+    local S = { V = Def or false, H = false };
 
-local TEXT_DEFAULT  = RGB( 160, 160, 160 );
-local TEXT_HOVER    = RGB( 184, 184, 184 );
-local TEXT_ACTIVE   = RGB( 216, 216, 216 );
-local TEXT_PRIMARY  = RGB( 200, 200, 200 );
-local TEXT_MUTED    = RGB( 112, 112, 112 );
-local TEXT_FAINT    = RGB( 62, 62, 62 );
-
-local BG_WINDOW     = RGB( 22, 22, 22 );
-local BG_FOOTER     = RGB( 14, 14, 14 );
-
-local BORDER_SOFT   = RGB( 54, 54, 54 );
-local BORDER_HOVER  = RGB( 74, 74, 74 );
-local BORDER_FAINT  = RGB( 40, 40, 40 );
-local BORDER_EDGE   = RGB( 13, 13, 13 );
-
-local FONT          = Enum.Font.Gotham;
-local FONT_MEDIUM   = Enum.Font.GothamMedium;
-local FONT_BOLD     = Enum.Font.GothamBold;
-
-local PANEL_WIDTH   = 230;
-local RIGHT_WIDTH   = 190;
-
--- ── Atoms ────────────────────────────────────────────────────────────────────
-
-local function MakeCheckbox( Parent, Text, Default, Callback )
-    local State = { Value = Default or false, Hovered = false };
-
-    local Container = Create( "Frame", {
+    local Row = C( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2.new( 1, 0, 0, 16 );
+        Size = UDim2.new( 1, 0, 0, 14 );
         Parent = Parent;
     } );
 
-    local Box = Create( "Frame", {
-        Size = Off2( 13, 13 );
-        Position = Off2( 0, 1 );
+    local Box = C( "Frame", {
+        Size = O2( 11, 11 );
+        Position = O2( 0, 1 );
         BorderSizePixel = 0;
-        Parent = Container;
+        Parent = Row;
     } );
-    Corner( Box, 2 );
+    CR( Box, 2 );
 
-    local BoxGrad = Gradient( Box, {
-        { 0, RGB( 32, 32, 32 ) };
-        { 1, RGB( 24, 24, 24 ) };
+    local BoxG = GR( Box, {
+        { 0, Color3.fromRGB( 32, 32, 32 ) };
+        { 1, Color3.fromRGB( 24, 24, 24 ) };
     }, 90 );
+    local BoxS = ST( Box, B_SOFT );
 
-    local BoxStroke = Stroke( Box, BORDER_SOFT );
-
-    local Check = Create( "TextLabel", {
+    local Tick = C( "TextLabel", {
         BackgroundTransparency = 1;
         Size = UDim2.new( 1, 0, 1, 0 );
         Text = "✓";
         TextColor3 = Color3.new( 1, 1, 1 );
-        TextSize = 11;
-        Font = FONT_BOLD;
+        TextSize = 9;
+        Font = FTB;
         TextTransparency = 1;
         Parent = Box;
     } );
 
-    local Label = Create( "TextLabel", {
+    local Label = C( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = Off2( 21, 0 );
-        Size = UDim2.new( 1, -21, 1, 0 );
+        Position = O2( 17, 0 );
+        Size = UDim2.new( 1, -17, 1, 0 );
         Text = Text;
-        TextColor3 = TEXT_DEFAULT;
-        TextSize = 11;
-        Font = FONT;
+        TextColor3 = TX_DEFAULT;
+        TextSize = 10;
+        Font = FT;
         TextXAlignment = Enum.TextXAlignment.Left;
-        Parent = Container;
+        Parent = Row;
     } );
 
     local function Refresh()
-        if ( State.Value ) then
-            BoxGrad.Color = ColorSequence.new( {
+        if S.V then
+            BoxG.Color = ColorSequence.new( {
                 ColorSequenceKeypoint.new( 0, ACCENT );
                 ColorSequenceKeypoint.new( 1, ACCENT_DIM );
             } );
-            BoxStroke.Color = ACCENT;
-            Check.TextTransparency = 0;
-            Label.TextColor3 = TEXT_ACTIVE;
-        elseif ( State.Hovered ) then
-            BoxGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 37, 37, 37 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 28, 28, 28 ) );
+            BoxS.Color = ACCENT;
+            Tick.TextTransparency = 0;
+            Label.TextColor3 = TX_ACTIVE;
+        elseif S.H then
+            BoxG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 37, 37, 37 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 28, 28, 28 ) );
             } );
-            BoxStroke.Color = BORDER_HOVER;
-            Check.TextTransparency = 1;
-            Label.TextColor3 = TEXT_HOVER;
+            BoxS.Color = B_HOVER;
+            Tick.TextTransparency = 1;
+            Label.TextColor3 = TX_HOVER;
         else
-            BoxGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 32, 32, 32 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 24, 24, 24 ) );
+            BoxG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 32, 32, 32 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 24, 24, 24 ) );
             } );
-            BoxStroke.Color = BORDER_SOFT;
-            Check.TextTransparency = 1;
-            Label.TextColor3 = TEXT_DEFAULT;
+            BoxS.Color = B_SOFT;
+            Tick.TextTransparency = 1;
+            Label.TextColor3 = TX_DEFAULT;
         end;
     end;
 
-    Container.InputBegan : Connect( function( Input )
-        if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then
-            return;
-        end;
-
-        State.Value = not State.Value;
-        Refresh();
-
-        if ( Callback ) then
-            Callback( State.Value );
-        end;
+    Row.InputBegan : Connect( function( Inp )
+        if Inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return; end;
+        S.V = not S.V; Refresh();
+        if CB then CB( S.V ); end;
     end );
-
-    Container.MouseEnter : Connect( function() State.Hovered = true; Refresh(); end );
-    Container.MouseLeave : Connect( function() State.Hovered = false; Refresh(); end );
+    Row.MouseEnter : Connect( function() S.H = true; Refresh(); end );
+    Row.MouseLeave : Connect( function() S.H = false; Refresh(); end );
 
     Refresh();
-
-    return {
-        Container = Container;
-        Set = function( Value ) State.Value = Value; Refresh(); end;
-        Get = function() return State.Value; end;
-    };
+    return { Container = Row; Set = function( V ) S.V = V; Refresh(); end; Get = function() return S.V; end; };
 end;
 
-local function MakeSlider( Parent, LabelText, Default, Callback )
-    local State = { Value = Default or 50, Dragging = false };
+local function Slider( Parent, Text, Def, CB )
+    local S = { V = Def or 50, D = false };
 
-    local Container = Create( "Frame", {
+    local Row = C( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2.new( 1, 0, 0, 24 );
+        Size = UDim2.new( 1, 0, 0, 20 );
         Parent = Parent;
     } );
 
-    local LabelRow = Create( "Frame", {
+    local LR = C( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2.new( 1, 0, 0, 14 );
-        Parent = Container;
+        Size = UDim2.new( 1, 0, 0, 11 );
+        Parent = Row;
     } );
 
-    Create( "TextLabel", {
+    C( "TextLabel", {
         BackgroundTransparency = 1;
         Size = UDim2.new( 1, 0, 1, 0 );
-        Text = LabelText;
-        TextColor3 = TEXT_DEFAULT;
-        TextSize = 11;
-        Font = FONT;
+        Text = Text;
+        TextColor3 = TX_DEFAULT;
+        TextSize = 10;
+        Font = FT;
         TextXAlignment = Enum.TextXAlignment.Left;
-        Parent = LabelRow;
+        Parent = LR;
     } );
 
-    local ValueLabel = Create( "TextLabel", {
+    local VL = C( "TextLabel", {
         BackgroundTransparency = 1;
         Size = UDim2.new( 1, 0, 1, 0 );
-        Text = tostring( State.Value ) .. "%";
+        Text = tostring( S.V ) .. "%";
         TextColor3 = ACCENT_BRIGHT;
-        TextSize = 11;
-        Font = FONT_BOLD;
+        TextSize = 10;
+        Font = FTB;
         TextXAlignment = Enum.TextXAlignment.Right;
-        Parent = LabelRow;
+        Parent = LR;
     } );
 
-    local Track = Create( "TextButton", {
-        BackgroundColor3 = RGB( 16, 16, 16 );
+    local Track = C( "TextButton", {
+        BackgroundColor3 = Color3.fromRGB( 16, 16, 16 );
         BorderSizePixel = 0;
-        Position = Off2( 0, 16 );
-        Size = UDim2.new( 1, 0, 0, 5 );
+        Position = O2( 0, 14 );
+        Size = UDim2.new( 1, 0, 0, 3 );
         Text = "";
         AutoButtonColor = false;
-        Parent = Container;
+        Parent = Row;
     } );
-    Corner( Track, 3 );
-    Gradient( Track, {
-        { 0, RGB( 16, 16, 16 ) };
-        { 1, RGB( 26, 26, 26 ) };
-    }, 90 );
-    Stroke( Track, RGB( 46, 46, 46 ) );
+    CR( Track, 2 );
+    GR( Track, { { 0, Color3.fromRGB( 16, 16, 16 ) }; { 1, Color3.fromRGB( 26, 26, 26 ) }; }, 90 );
+    ST( Track, Color3.fromRGB( 46, 46, 46 ) );
 
-    local Fill = Create( "Frame", {
+    local Fill = C( "Frame", {
         BackgroundColor3 = ACCENT;
         BorderSizePixel = 0;
-        Size = UDim2.new( State.Value / 100, 0, 1, 0 );
+        Size = UDim2.new( S.V / 100, 0, 1, 0 );
         Parent = Track;
     } );
-    Corner( Fill, 3 );
-    Gradient( Fill, {
-        { 0, ACCENT_DIM };
-        { 1, ACCENT_BRIGHT };
-    }, 0 );
+    CR( Fill, 2 );
+    GR( Fill, { { 0, ACCENT_DIM }; { 1, ACCENT_BRIGHT }; }, 0 );
 
-    local Thumb = Create( "Frame", {
-        BackgroundColor3 = RGB( 224, 224, 224 );
+    local Thumb = C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 224, 224, 224 );
         BorderSizePixel = 0;
         AnchorPoint = Vector2.new( 0.5, 0.5 );
-        Position = UDim2.new( State.Value / 100, 0, 0.5, 0 );
-        Size = Off2( 9, 9 );
+        Position = UDim2.new( S.V / 100, 0, 0.5, 0 );
+        Size = O2( 7, 7 );
         ZIndex = 2;
         Parent = Track;
     } );
-    Corner( Thumb, 100 );
-    Gradient( Thumb, {
-        { 0, RGB( 224, 224, 224 ) };
-        { 1, RGB( 176, 176, 176 ) };
-    }, 90 );
-    Stroke( Thumb, ACCENT );
+    CR( Thumb, 100 );
+    GR( Thumb, { { 0, Color3.fromRGB( 224, 224, 224 ) }; { 1, Color3.fromRGB( 176, 176, 176 ) }; }, 90 );
+    ST( Thumb, ACCENT );
 
     local function Refresh()
-        local Percent = State.Value / 100;
-        Fill.Size = UDim2.new( Percent, 0, 1, 0 );
-        Thumb.Position = UDim2.new( Percent, 0, 0.5, 0 );
-        ValueLabel.Text = tostring( State.Value ) .. "%";
+        local P = S.V / 100;
+        Fill.Size = UDim2.new( P, 0, 1, 0 );
+        Thumb.Position = UDim2.new( P, 0, 0.5, 0 );
+        VL.Text = tostring( S.V ) .. "%";
     end;
 
-    local function FromMouse( MouseX )
-        local Percent = math.clamp( ( MouseX - Track.AbsolutePosition.X ) / Track.AbsoluteSize.X, 0, 1 );
-        State.Value = math.floor( Percent * 100 );
-
+    local function FromMouse( X )
+        local P = math.clamp( ( X - Track.AbsolutePosition.X ) / Track.AbsoluteSize.X, 0, 1 );
+        S.V = math.floor( P * 100 );
         Refresh();
-
-        if ( Callback ) then
-            Callback( State.Value );
-        end;
+        if CB then CB( S.V ); end;
     end;
 
-    Track.InputBegan : Connect( function( Input )
-        if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then
-            return;
-        end;
-
-        State.Dragging = true;
-        FromMouse( Input.Position.X );
+    Track.InputBegan : Connect( function( Inp )
+        if Inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return; end;
+        S.D = true; FromMouse( Inp.Position.X );
     end );
-
-    UserInputService.InputChanged : Connect( function( Input )
-        if ( State.Dragging ) and ( Input.UserInputType == Enum.UserInputType.MouseMovement ) then
-            FromMouse( Input.Position.X );
-        end;
+    UIS.InputChanged : Connect( function( Inp )
+        if S.D and Inp.UserInputType == Enum.UserInputType.MouseMovement then FromMouse( Inp.Position.X ); end;
     end );
-
-    UserInputService.InputEnded : Connect( function( Input )
-        if ( Input.UserInputType == Enum.UserInputType.MouseButton1 ) then
-            State.Dragging = false;
-        end;
+    UIS.InputEnded : Connect( function( Inp )
+        if Inp.UserInputType == Enum.UserInputType.MouseButton1 then S.D = false; end;
     end );
 
     Refresh();
-
-    return {
-        Container = Container;
-        Set = function( Value ) State.Value = Value; Refresh(); end;
-        Get = function() return State.Value; end;
-    };
+    return { Container = Row; Set = function( V ) S.V = V; Refresh(); end; Get = function() return S.V; end; };
 end;
 
-local function MakeDropdown( Parent, Options, Default, Callback )
-    local State = { Value = Default or Options[ 1 ] or "", Open = false, Hovered = nil };
+local function Dropdown( Parent, Options, Def, CB )
+    local S = { V = Def or Options[ 1 ] or "", Op = false, H = nil };
 
-    local Container = Create( "Frame", {
+    local Box = C( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2.new( 1, 0, 0, 20 );
+        Size = UDim2.new( 1, 0, 0, 16 );
         ZIndex = 3;
         Parent = Parent;
     } );
 
-    local Trigger = Create( "TextButton", {
+    local Trig = C( "TextButton", {
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 1, 0 );
         Text = "";
         AutoButtonColor = false;
-        Parent = Container;
+        Parent = Box;
     } );
-    Corner( Trigger, 3 );
-    Stroke( Trigger, RGB( 58, 58, 58 ) );
+    CR( Trig, 3 );
+    ST( Trig, Color3.fromRGB( 58, 58, 58 ) );
+    local TG = GR( Trig, { { 0, Color3.fromRGB( 35, 35, 35 ) }; { 1, Color3.fromRGB( 26, 26, 26 ) }; }, 90 );
 
-    local TriggerGrad = Gradient( Trigger, {
-        { 0, RGB( 35, 35, 35 ) };
-        { 1, RGB( 26, 26, 26 ) };
-    }, 90 );
-
-    local TriggerText = Create( "TextLabel", {
+    local TT = C( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = Off2( 8, 0 );
-        Size = UDim2.new( 1, -20, 1, 0 );
-        Text = State.Value;
-        TextColor3 = TEXT_PRIMARY;
-        TextSize = 11;
-        Font = FONT;
-        TextXAlignment = Enum.TextXAlignment.Left;
-        Parent = Trigger;
-    } );
-
-    Create( "TextLabel", {
-        BackgroundTransparency = 1;
-        Position = UDim2.new( 1, -14, 0, 0 );
-        Size = Off2( 10, 20 );
-        Text = "v";
-        TextColor3 = RGB( 136, 136, 136 );
+        Position = O2( 7, 0 );
+        Size = UDim2.new( 1, -18, 1, 0 );
+        Text = S.V;
+        TextColor3 = TX_PRIMARY;
         TextSize = 10;
-        Font = FONT_BOLD;
-        Parent = Trigger;
+        Font = FT;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        Parent = Trig;
     } );
 
-    local List = Create( "Frame", {
-        BackgroundColor3 = RGB( 30, 30, 30 );
+    local Chev = C( "TextLabel", {
+        BackgroundTransparency = 1;
+        Position = UDim2.new( 1, -13, 0, 0 );
+        Size = O2( 9, 16 );
+        Text = "v";
+        TextColor3 = Color3.fromRGB( 136, 136, 136 );
+        TextSize = 10;
+        Font = FTB;
+        Parent = Trig;
+    } );
+
+    local List = C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 30, 30, 30 );
         BorderSizePixel = 0;
-        Position = Off2( 0, 20 );
+        Position = O2( 0, 16 );
         Size = UDim2.new( 1, 0, 0, 0 );
         ClipsDescendants = true;
         Visible = false;
         ZIndex = 5;
-        Parent = Container;
+        Parent = Box;
     } );
-    Corner( List, 3 );
-    Stroke( List, ACCENT );
-
-    Create( "UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder;
-        Parent = List;
-    } );
+    CR( List, 3 );
+    ST( List, ACCENT );
+    C( "UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder; Parent = List; } );
 
     local Rows = { };
 
-    for Index, Option in ipairs( Options ) do
-        local Row = Create( "TextButton", {
+    for i, Opt in ipairs( Options ) do
+        local Row = C( "TextButton", {
             BackgroundTransparency = 1;
-            Size = UDim2.new( 1, 0, 0, 20 );
+            Size = UDim2.new( 1, 0, 0, 16 );
             Text = "";
             AutoButtonColor = false;
-            LayoutOrder = Index;
+            LayoutOrder = i;
             Parent = List;
         } );
 
-        local RowAccent = Create( "Frame", {
+        local Acc = C( "Frame", {
             BackgroundColor3 = ACCENT;
             BorderSizePixel = 0;
-            Size = Off2( 2, 20 );
+            Size = O2( 2, 16 );
             Visible = false;
             Parent = Row;
         } );
 
-        local RowText = Create( "TextLabel", {
+        local RowT = C( "TextLabel", {
             BackgroundTransparency = 1;
-            Position = Off2( 8, 0 );
-            Size = UDim2.new( 1, -8, 1, 0 );
-            Text = Option;
-            TextColor3 = RGB( 184, 184, 184 );
-            TextSize = 11;
-            Font = FONT;
+            Position = O2( 7, 0 );
+            Size = UDim2.new( 1, -7, 1, 0 );
+            Text = Opt;
+            TextColor3 = Color3.fromRGB( 184, 184, 184 );
+            TextSize = 10;
+            Font = FT;
             TextXAlignment = Enum.TextXAlignment.Left;
             Parent = Row;
         } );
 
-        Rows[ Option ] = { Text = RowText, Accent = RowAccent };
+        Rows[ Opt ] = { Text = RowT, Acc = Acc };
 
-        Row.InputBegan : Connect( function( Input )
-            if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then
-                return;
-            end;
-
-            State.Value = Option;
-            TriggerText.Text = Option;
-
-            if ( Callback ) then
-                Callback( Option );
-            end;
-
-            State.Open = false;
-            Refresh();
+        Row.InputBegan : Connect( function( Inp )
+            if Inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return; end;
+            S.V = Opt; TT.Text = Opt;
+            if CB then CB( Opt ); end;
+            S.Op = false; Refresh();
         end );
-
-        Row.MouseEnter : Connect( function() State.Hovered = Option; Refresh(); end );
-        Row.MouseLeave : Connect( function() State.Hovered = nil; Refresh(); end );
+        Row.MouseEnter : Connect( function() S.H = Opt; Refresh(); end );
+        Row.MouseLeave : Connect( function() S.H = nil; Refresh(); end );
     end;
 
     local function Refresh()
-        if ( State.Open ) then
-            TriggerGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 40, 40, 40 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 30, 30, 30 ) );
+        if S.Op then
+            TG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 40, 40, 40 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 30, 30, 30 ) );
             } );
+            Chev.Rotation = 180;
         else
-            TriggerGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 35, 35, 35 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 26, 26, 26 ) );
+            TG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 35, 35, 35 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 26, 26, 26 ) );
             } );
+            Chev.Rotation = 0;
         end;
 
-        for Option, Entry in pairs( Rows ) do
-            if ( Option == State.Value ) then
+        for Opt, Entry in pairs( Rows ) do
+            if Opt == S.V then
                 Entry.Text.TextColor3 = ACCENT_BRIGHT;
-                Entry.Text.Font = FONT_BOLD;
-                Entry.Accent.Visible = false;
-            elseif ( Option == State.Hovered ) then
-                Entry.Text.TextColor3 = RGB( 221, 221, 221 );
-                Entry.Text.Font = FONT;
-                Entry.Accent.Visible = true;
+                Entry.Text.Font = FTB;
+                Entry.Acc.Visible = false;
+            elseif Opt == S.H then
+                Entry.Text.TextColor3 = Color3.fromRGB( 221, 221, 221 );
+                Entry.Text.Font = FT;
+                Entry.Acc.Visible = true;
             else
-                Entry.Text.TextColor3 = RGB( 184, 184, 184 );
-                Entry.Text.Font = FONT;
-                Entry.Accent.Visible = false;
+                Entry.Text.TextColor3 = Color3.fromRGB( 184, 184, 184 );
+                Entry.Text.Font = FT;
+                Entry.Acc.Visible = false;
             end;
         end;
 
-        TweenService : Create( List, TweenInfo.new( 0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out ), {
-            Size = State.Open and UDim2.new( 1, 0, 0, #Options * 20 ) or UDim2.new( 1, 0, 0, 0 );
+        Tw : Create( List, TweenInfo.new( 0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out ), {
+            Size = S.Op and UDim2.new( 1, 0, 0, #Options * 16 ) or UDim2.new( 1, 0, 0, 0 );
         } ) : Play();
-
-        List.Visible = State.Open or List.Size.Y.Offset > 0;
+        List.Visible = S.Op or List.Size.Y.Offset > 0;
     end;
 
-    Trigger.MouseButton1Click : Connect( function()
-        State.Open = not State.Open;
-        Refresh();
-    end );
-
+    Trig.MouseButton1Click : Connect( function() S.Op = not S.Op; Refresh(); end );
     Refresh();
-
-    return {
-        Container = Container;
-        Set = function( Value ) State.Value = Value; TriggerText.Text = Value; Refresh(); end;
-        Get = function() return State.Value; end;
-    };
+    return { Container = Box; Set = function( V ) S.V = V; TT.Text = V; Refresh(); end; Get = function() return S.V; end; };
 end;
 
-local function MakeDivider( Parent )
-    local Divider = Create( "Frame", {
-        BackgroundColor3 = RGB( 44, 44, 44 );
+local function Divider( Parent )
+    local D = C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 44, 44, 44 );
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 0, 1 );
         Parent = Parent;
     } );
-    Gradient( Divider, {
-        { 0, RGB( 22, 22, 22 ) };
-        { 0.2, RGB( 44, 44, 44 ) };
-        { 0.5, RGB( 56, 56, 56 ) };
-        { 0.8, RGB( 44, 44, 44 ) };
-        { 1, RGB( 22, 22, 22 ) };
+    GR( D, {
+        { 0, Color3.fromRGB( 22, 22, 22 ) };
+        { 0.2, Color3.fromRGB( 44, 44, 44 ) };
+        { 0.5, Color3.fromRGB( 56, 56, 56 ) };
+        { 0.8, Color3.fromRGB( 44, 44, 44 ) };
+        { 1, Color3.fromRGB( 22, 22, 22 ) };
     }, 0 );
-
-    return Divider;
+    return D;
 end;
 
-local function MakeSectionLabel( Parent, Text )
-    return Create( "TextLabel", {
+local function SectionLabel( Parent, Text )
+    return C( "TextLabel", {
         BackgroundTransparency = 1;
-        Size = UDim2.new( 1, 0, 0, 12 );
+        Size = UDim2.new( 1, 0, 0, 11 );
         Text = string.upper( Text );
-        TextColor3 = RGB( 120, 120, 120 );
-        TextSize = 10;
-        Font = FONT;
+        TextColor3 = Color3.fromRGB( 120, 120, 120 );
+        TextSize = 9;
+        Font = FT;
         TextXAlignment = Enum.TextXAlignment.Left;
         Parent = Parent;
     } );
 end;
 
-local function MakePanelHeading( Parent, Text )
-    local Container = Create( "Frame", {
+local function Heading( Parent, Text )
+    local H = C( "Frame", {
         BackgroundTransparency = 1;
-        Size = UDim2.new( 1, 0, 0, 16 );
+        Size = UDim2.new( 1, 0, 0, 14 );
         Parent = Parent;
     } );
 
-    local Bar = Create( "Frame", {
+    local Bar = C( "Frame", {
         BackgroundColor3 = ACCENT_BRIGHT;
         BorderSizePixel = 0;
-        Position = Off2( 0, 2 );
-        Size = Off2( 3, 11 );
-        Parent = Container;
+        Position = O2( 0, 1.5 );
+        Size = O2( 3, 11 );
+        Parent = H;
     } );
-    Corner( Bar, 1 );
-    Gradient( Bar, {
-        { 0, ACCENT_BRIGHT };
-        { 1, ACCENT_DIM };
-    }, 90 );
+    CR( Bar, 1 );
+    GR( Bar, { { 0, ACCENT_BRIGHT }; { 1, ACCENT_DIM }; }, 90 );
 
-    Create( "TextLabel", {
+    C( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = Off2( 8, 0 );
+        Position = O2( 8, 0 );
         Size = UDim2.new( 1, -8, 1, 0 );
         Text = Text;
-        TextColor3 = TEXT_PRIMARY;
-        TextSize = 11;
-        Font = FONT_BOLD;
+        TextColor3 = TX_PRIMARY;
+        TextSize = 10;
+        Font = FTB;
         TextXAlignment = Enum.TextXAlignment.Left;
-        Parent = Container;
+        Parent = H;
     } );
 
-    return Container;
+    return H;
 end;
 
-local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
-    local State = { Active = false, Hovered = false };
+local function Tab( Parent, Text, Small, Order, Click )
+    local S = { A = false, H = false };
 
-    local Tab = Create( "TextButton", {
+    local T = C( "TextButton", {
         BorderSizePixel = 0;
-        Size = Off2( 60, Small and 22 or 24 );
+        Size = O2( 55, Small and 20 or 22 );
         Text = "";
         AutoButtonColor = false;
-        LayoutOrder = LayoutOrder or 0;
+        LayoutOrder = Order;
         Parent = Parent;
     } );
 
-    local Fill = Create( "Frame", {
-        BackgroundTransparency = 1;
+    local Fill = C( "Frame", {
+        BackgroundTransparency = 0;
         Size = UDim2.new( 1, 0, 1, 0 );
-        Parent = Tab;
+        Parent = T;
     } );
-    local FillGrad = Gradient( Fill, {
-        { 0, RGB( 28, 28, 28 ) };
-        { 1, RGB( 20, 20, 20 ) };
-    }, 90 );
+    local FG = GR( Fill, { { 0, Color3.fromRGB( 28, 28, 28 ) }; { 1, Color3.fromRGB( 20, 20, 20 ) }; }, 90 );
 
-    local Label = Create( "TextLabel", {
+    local Lbl = C( "TextLabel", {
         BackgroundTransparency = 1;
         Size = UDim2.new( 1, 0, 1, 0 );
         Text = Text;
-        TextColor3 = TEXT_MUTED;
-        TextSize = Small and 10 or 11;
-        Font = FONT;
-        Parent = Tab;
+        TextColor3 = TX_MUTED;
+        TextSize = Small and 9 or 10;
+        Font = FT;
+        Parent = T;
     } );
 
-    local TopBorder = Create( "Frame", {
-        BackgroundColor3 = BORDER_FAINT;
+    local TopB = C( "Frame", {
+        BackgroundColor3 = B_FAINT;
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 0, 1 );
-        Parent = Tab;
+        Parent = T;
     } );
 
-    -- The bottom "connect" tail — when active, this 1px frame reaches below
-    -- the tab and covers the panel divider, matching marginBottom: -1 in TSX.
-    local Tail = Create( "Frame", {
-        BackgroundColor3 = RGB( 32, 32, 32 );
+    -- When active, this fills the panel-divider line under the tab
+    local Tail = C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 30, 30, 30 );
         BorderSizePixel = 0;
         Position = UDim2.new( 0, 0, 1, 0 );
         Size = UDim2.new( 1, 0, 0, 1 );
         Visible = false;
-        ZIndex = 5;
-        Parent = Tab;
+        ZIndex = 6;
+        Parent = T;
     } );
 
     local function Refresh()
-        local Padding = Small and 18 or 24;
-        Tab.Size = Off2( Label.TextBounds.X + Padding, Small and 22 or 24 );
+        local Pad = Small and 16 or 22;
+        T.Size = O2( Lbl.TextBounds.X + Pad, Small and 20 or 22 );
 
-        if ( State.Active ) then
-            Fill.BackgroundTransparency = 1;
-            FillGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 42, 42, 42 ) );
-                ColorSequenceKeypoint.new( 0.6, RGB( 32, 32, 32 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 28, 28, 28 ) );
+        if S.A then
+            FG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 42, 42, 42 ) );
+                ColorSequenceKeypoint.new( 0.6, Color3.fromRGB( 32, 32, 32 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 28, 28, 28 ) );
             } );
-            Label.TextColor3 = RGB( 224, 224, 224 );
-            Label.Font = FONT_BOLD;
-            TopBorder.BackgroundColor3 = ACCENT;
+            Lbl.TextColor3 = Color3.fromRGB( 224, 224, 224 );
+            Lbl.Font = FTB;
+            TopB.BackgroundColor3 = ACCENT;
             Tail.Visible = true;
-            Tab.ZIndex = 3;
-        elseif ( State.Hovered ) then
-            Fill.BackgroundTransparency = 0;
-            FillGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 34, 34, 34 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 26, 26, 26 ) );
+            T.ZIndex = 3;
+        elseif S.H then
+            FG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 34, 34, 34 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 26, 26, 26 ) );
             } );
-            Label.TextColor3 = TEXT_HOVER;
-            Label.Font = FONT;
-            TopBorder.BackgroundColor3 = RGB( 64, 64, 64 );
+            Lbl.TextColor3 = TX_HOVER;
+            Lbl.Font = FT;
+            TopB.BackgroundColor3 = Color3.fromRGB( 64, 64, 64 );
             Tail.Visible = false;
-            Tab.ZIndex = 1;
+            T.ZIndex = 1;
         else
-            Fill.BackgroundTransparency = 0;
-            FillGrad.Color = ColorSequence.new( {
-                ColorSequenceKeypoint.new( 0, RGB( 28, 28, 28 ) );
-                ColorSequenceKeypoint.new( 1, RGB( 20, 20, 20 ) );
+            FG.Color = ColorSequence.new( {
+                ColorSequenceKeypoint.new( 0, Color3.fromRGB( 28, 28, 28 ) );
+                ColorSequenceKeypoint.new( 1, Color3.fromRGB( 20, 20, 20 ) );
             } );
-            Label.TextColor3 = TEXT_MUTED;
-            Label.Font = FONT;
-            TopBorder.BackgroundColor3 = BORDER_FAINT;
+            Lbl.TextColor3 = TX_MUTED;
+            Lbl.Font = FT;
+            TopB.BackgroundColor3 = B_FAINT;
             Tail.Visible = false;
-            Tab.ZIndex = 1;
+            T.ZIndex = 1;
         end;
     end;
 
-    Tab.MouseButton1Click : Connect( function()
-        if ( OnClick ) then OnClick(); end;
-    end );
-
-    Tab.MouseEnter : Connect( function() State.Hovered = true; Refresh(); end );
-    Tab.MouseLeave : Connect( function() State.Hovered = false; Refresh(); end );
+    T.MouseButton1Click : Connect( function() if Click then Click(); end; end );
+    T.MouseEnter : Connect( function() S.H = true; Refresh(); end );
+    T.MouseLeave : Connect( function() S.H = false; Refresh(); end );
 
     Refresh();
     task.defer( Refresh );
 
-    return {
-        Tab = Tab;
-        SetActive = function( Value ) State.Active = Value; Refresh(); end;
-    };
+    return { Tab = T; SetActive = function( V ) S.A = V; Refresh(); end; };
 end;
 
--- ── Page (wrapper around a Frame) ────────────────────────────────────────────
+-- ── Page wrapper ────────────────────────────────────────────────────────────
 
 local Page = { };
 Page.__index = Page;
 
-local function NewPage( Frame )
-    return setmetatable( { Frame = Frame }, Page );
-end;
+function Page : Checkbox( L, D, CB ) return Checkbox( self.Frame, L, D, CB ); end;
+function Page : Slider( L, D, CB ) return Slider( self.Frame, L, D, CB ); end;
+function Page : Dropdown( O, D, CB ) return Dropdown( self.Frame, O, D, CB ); end;
+function Page : Divider() return Divider( self.Frame ); end;
+function Page : Label( T ) return SectionLabel( self.Frame, T ); end;
 
-function Page : Checkbox( Label, Default, Callback )
-    return MakeCheckbox( self.Frame, Label, Default, Callback );
-end;
-
-function Page : Slider( Label, Default, Callback )
-    return MakeSlider( self.Frame, Label, Default, Callback );
-end;
-
-function Page : Dropdown( Options, Default, Callback )
-    return MakeDropdown( self.Frame, Options, Default, Callback );
-end;
-
-function Page : Divider()
-    return MakeDivider( self.Frame );
-end;
-
-function Page : Label( Text )
-    return MakeSectionLabel( self.Frame, Text );
-end;
-
--- ── Interface ────────────────────────────────────────────────────────────────
+-- ── Interface ───────────────────────────────────────────────────────────────
 
 local Interface = { };
 Interface.__index = Interface;
@@ -706,437 +576,394 @@ Interface.__index = Interface;
 function Interface.new( Title )
     Title = Title or "juanita****.club";
 
-    local ScreenGui = Create( "ScreenGui", {
+    local SG = C( "ScreenGui", {
         Name = "juanita_club";
         ResetOnSpawn = false;
         IgnoreGuiInset = true;
         ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
-        Parent = CoreGui;
+        Parent = CG;
     } );
 
-    -- Window
-    local Window = Create( "Frame", {
-        BackgroundColor3 = BG_WINDOW;
+    local Win = C( "Frame", {
+        BackgroundColor3 = BG_WIN;
         BorderSizePixel = 0;
         AnchorPoint = Vector2.new( 0.5, 0.5 );
         Position = UDim2.new( 0.5, 0, 0.5, 0 );
-        Size = Off2( 420, 380 );
+        Size = O2( 400, 260 );
         ClipsDescendants = true;
-        Parent = ScreenGui;
+        Parent = SG;
     } );
-    Corner( Window, 4 );
-    Stroke( Window, BORDER_EDGE );
+    CR( Win, 4 );
+    ST( Win, B_EDGE );
 
     -- Title bar
-    local TitleBar = Create( "Frame", {
+    local TB = C( "Frame", {
         BorderSizePixel = 0;
-        Size = UDim2.new( 1, 0, 0, 26 );
-        Parent = Window;
+        Size = UDim2.new( 1, 0, 0, 22 );
+        Parent = Win;
     } );
-    Gradient( TitleBar, {
-        { 0, RGB( 42, 42, 42 ) };
-        { 0.5, RGB( 31, 31, 31 ) };
-        { 1, RGB( 26, 26, 26 ) };
+    GR( TB, {
+        { 0, Color3.fromRGB( 42, 42, 42 ) };
+        { 0.5, Color3.fromRGB( 31, 31, 31 ) };
+        { 1, Color3.fromRGB( 26, 26, 26 ) };
     }, 90 );
 
-    Create( "Frame", {
-        BackgroundColor3 = RGB( 10, 10, 10 );
+    C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 10, 10, 10 );
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 0, 1 );
         Position = UDim2.new( 0, 0, 1, -1 );
-        Parent = TitleBar;
+        Parent = TB;
     } );
 
-    local BrandMark = Create( "Frame", {
+    local Mark = C( "Frame", {
         BackgroundColor3 = ACCENT_BRIGHT;
         BorderSizePixel = 0;
-        Position = Off2( 10, 7 );
-        Size = Off2( 10, 12 );
-        Parent = TitleBar;
+        Position = O2( 9, 6 );
+        Size = O2( 9, 11 );
+        Parent = TB;
     } );
-    Corner( BrandMark, 2 );
-    Gradient( BrandMark, {
-        { 0, ACCENT_BRIGHT };
-        { 1, ACCENT_DIM };
-    }, 90 );
+    CR( Mark, 2 );
+    GR( Mark, { { 0, ACCENT_BRIGHT }; { 1, ACCENT_DIM }; }, 90 );
 
-    Create( "TextLabel", {
+    C( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = Off2( 24, 0 );
-        Size = UDim2.new( 1, -90, 1, 0 );
+        Position = O2( 22, 0 );
+        Size = UDim2.new( 1, -80, 1, 0 );
         Text = Title;
-        TextColor3 = TEXT_PRIMARY;
-        TextSize = 11;
-        Font = FONT_MEDIUM;
-        TextXAlignment = Enum.TextXAlignment.Left;
-        Parent = TitleBar;
-    } );
-
-    local TitleButtons = Create( "Frame", {
-        BackgroundTransparency = 1;
-        Position = UDim2.new( 1, -42, 0, 6 );
-        Size = Off2( 38, 14 );
-        Parent = TitleBar;
-    } );
-
-    local MinBtn = Create( "TextButton", {
-        BackgroundColor3 = RGB( 46, 46, 46 );
-        BorderSizePixel = 0;
-        Size = Off2( 18, 14 );
-        Text = "-";
-        TextColor3 = RGB( 144, 144, 144 );
-        TextSize = 11;
-        Font = FONT;
-        AutoButtonColor = false;
-        Parent = TitleButtons;
-    } );
-    Corner( MinBtn, 2 );
-    Stroke( MinBtn, RGB( 72, 72, 72 ) );
-
-    local CloseBtn = Create( "TextButton", {
-        BackgroundColor3 = RGB( 146, 32, 32 );
-        BorderSizePixel = 0;
-        Position = Off2( 21, 0 );
-        Size = Off2( 18, 14 );
-        Text = "x";
-        TextColor3 = RGB( 238, 238, 238 );
+        TextColor3 = TX_PRIMARY;
         TextSize = 10;
-        Font = FONT;
-        AutoButtonColor = false;
-        Parent = TitleButtons;
+        Font = FTM;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        Parent = TB;
     } );
-    Corner( CloseBtn, 2 );
-    Stroke( CloseBtn, RGB( 106, 16, 16 ) );
+
+    local TBtn = C( "Frame", {
+        BackgroundTransparency = 1;
+        Position = UDim2.new( 1, -38, 0, 5 );
+        Size = O2( 34, 12 );
+        Parent = TB;
+    } );
+
+    local Min = C( "TextButton", {
+        BackgroundColor3 = Color3.fromRGB( 46, 46, 46 );
+        BorderSizePixel = 0;
+        Size = O2( 16, 12 );
+        Text = "-";
+        TextColor3 = Color3.fromRGB( 144, 144, 144 );
+        TextSize = 10;
+        Font = FT;
+        AutoButtonColor = false;
+        Parent = TBtn;
+    } );
+    CR( Min, 2 );
+    ST( Min, Color3.fromRGB( 72, 72, 72 ) );
+
+    local Cls = C( "TextButton", {
+        BackgroundColor3 = Color3.fromRGB( 146, 32, 32 );
+        BorderSizePixel = 0;
+        Position = O2( 18, 0 );
+        Size = O2( 16, 12 );
+        Text = "x";
+        TextColor3 = Color3.fromRGB( 238, 238, 238 );
+        TextSize = 9;
+        Font = FT;
+        AutoButtonColor = false;
+        Parent = TBtn;
+    } );
+    CR( Cls, 2 );
+    ST( Cls, Color3.fromRGB( 106, 16, 16 ) );
 
     -- Main tab strip
-    local TabStrip = Create( "Frame", {
+    local TS = C( "Frame", {
         BorderSizePixel = 0;
-        Position = Off2( 0, 26 );
-        Size = UDim2.new( 1, 0, 0, 28 );
-        Parent = Window;
+        Position = O2( 0, 22 );
+        Size = UDim2.new( 1, 0, 0, 26 );
+        Parent = Win;
     } );
-    Gradient( TabStrip, {
-        { 0, RGB( 22, 22, 22 ) };
-        { 1, RGB( 18, 18, 18 ) };
-    }, 90 );
+    GR( TS, { { 0, Color3.fromRGB( 22, 22, 22 ) }; { 1, Color3.fromRGB( 18, 18, 18 ) }; }, 90 );
 
-    -- The border that active tabs "merge" into
-    local StripBorder = Create( "Frame", {
-        BackgroundColor3 = RGB( 46, 46, 46 );
+    C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 46, 46, 46 );
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 0, 1 );
         Position = UDim2.new( 0, 0, 1, -1 );
-        Parent = TabStrip;
+        Parent = TS;
     } );
 
-    local TabHolder = Create( "Frame", {
+    local THolder = C( "Frame", {
         BackgroundTransparency = 1;
-        Position = Off2( 6, 4 );
+        Position = O2( 6, 4 );
         Size = UDim2.new( 1, -12, 1, -4 );
-        Parent = TabStrip;
+        Parent = TS;
     } );
-
-    Create( "UIListLayout", {
+    C( "UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal;
         SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = Off( 2 );
+        Padding = O( 2 );
         VerticalAlignment = Enum.VerticalAlignment.Bottom;
-        Parent = TabHolder;
+        Parent = THolder;
     } );
 
     -- Body
-    local Body = Create( "Frame", {
-        BackgroundColor3 = BG_WINDOW;
+    local Body = C( "Frame", {
+        BackgroundColor3 = BG_WIN;
         BorderSizePixel = 0;
-        Position = Off2( 0, 54 );
-        Size = UDim2.new( 1, 0, 0, 300 );
-        Parent = Window;
+        Position = O2( 0, 48 );
+        Size = UDim2.new( 1, 0, 0, 200 );
+        Parent = Win;
     } );
 
-    local LeftPanel = Create( "Frame", {
-        BackgroundColor3 = BG_WINDOW;
+    local LP = C( "Frame", {
+        BackgroundColor3 = BG_WIN;
         BorderSizePixel = 0;
-        Size = Off2( PANEL_WIDTH, 300 );
+        Size = O2( PANEL_W, 200 );
         Parent = Body;
     } );
 
-    local LeftInner = Create( "Frame", {
+    local LI = C( "Frame", {
         BackgroundTransparency = 1;
-        Position = Off2( 12, 10 );
-        Size = Off2( PANEL_WIDTH - 24, 0 );
+        Position = O2( 8, 8 );
+        Size = O2( PANEL_W - 16, 0 );
         AutomaticSize = Enum.AutomaticSize.Y;
-        Parent = LeftPanel;
+        Parent = LP;
     } );
 
-    Create( "UIListLayout", {
-        SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = Off( 0 );
-        Parent = LeftInner;
-    } );
-
-    Create( "Frame", {
-        BackgroundColor3 = RGB( 32, 32, 32 );
+    local Div = C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 32, 32, 32 );
         BorderSizePixel = 0;
-        Position = Off2( PANEL_WIDTH, 0 );
-        Size = Off2( 1, 300 );
+        Position = O2( PANEL_W, 0 );
+        Size = O2( 1, 200 );
         Parent = Body;
     } );
 
-    local RightPanel = Create( "Frame", {
-        BackgroundColor3 = BG_WINDOW;
+    local RP = C( "Frame", {
+        BackgroundColor3 = BG_WIN;
         BorderSizePixel = 0;
-        Position = Off2( PANEL_WIDTH + 1, 0 );
-        Size = Off2( RIGHT_WIDTH, 300 );
+        Position = O2( PANEL_W + 1, 0 );
+        Size = O2( RIGHT_W, 200 );
         Parent = Body;
     } );
 
-    local RightInner = Create( "Frame", {
+    -- Right: sub-tab strip + content, both positioned manually
+    local RStrip = C( "Frame", {
         BackgroundTransparency = 1;
-        Position = Off2( 10, 8 );
-        Size = Off2( RIGHT_WIDTH - 20, 0 );
-        AutomaticSize = Enum.AutomaticSize.Y;
-        Parent = RightPanel;
+        Position = O2( 8, 8 );
+        Size = O2( RIGHT_W - 16, 22 );
+        Parent = RP;
     } );
-
-    -- Right sub-tab strip
-    local RightStrip = Create( "Frame", {
-        BackgroundTransparency = 1;
-        Size = Off2( RIGHT_WIDTH - 20, 22 );
-        Parent = RightInner;
-    } );
-
-    Create( "Frame", {
-        BackgroundColor3 = RGB( 46, 46, 46 );
+    C( "Frame", {
+        BackgroundColor3 = B_FAINT;
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 0, 1 );
         Position = UDim2.new( 0, 0, 1, -1 );
-        Parent = RightStrip;
+        Parent = RStrip;
     } );
-
-    Create( "UIListLayout", {
+    C( "UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal;
         SortOrder = Enum.SortOrder.LayoutOrder;
-        Padding = Off( 1 );
+        Padding = O( 2 );
         VerticalAlignment = Enum.VerticalAlignment.Bottom;
-        Parent = RightStrip;
+        Parent = RStrip;
+    } );
+
+    local RContent = C( "Frame", {
+        BackgroundTransparency = 1;
+        Position = O2( 8, 36 );
+        Size = O2( RIGHT_W - 16, 0 );
+        Parent = RP;
     } );
 
     -- Footer
-    local Footer = Create( "Frame", {
+    local FT_ = C( "Frame", {
         BorderSizePixel = 0;
-        Position = UDim2.new( 0, 0, 1, -20 );
-        Size = UDim2.new( 1, 0, 0, 20 );
-        Parent = Window;
+        Position = UDim2.new( 0, 0, 1, -18 );
+        Size = UDim2.new( 1, 0, 0, 18 );
+        Parent = Win;
     } );
-    Gradient( Footer, {
-        { 0, RGB( 18, 18, 18 ) };
-        { 1, RGB( 14, 14, 14 ) };
-    }, 90 );
-
-    Create( "Frame", {
-        BackgroundColor3 = RGB( 30, 30, 30 );
+    GR( FT_, { { 0, Color3.fromRGB( 18, 18, 18 ) }; { 1, Color3.fromRGB( 14, 14, 14 ) }; }, 90 );
+    C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 30, 30, 30 );
         BorderSizePixel = 0;
         Size = UDim2.new( 1, 0, 0, 1 );
-        Parent = Footer;
+        Parent = FT_;
     } );
 
-    Create( "TextLabel", {
+    C( "TextLabel", {
         BackgroundTransparency = 1;
-        Position = Off2( 10, 0 );
+        Position = O2( 10, 0 );
         Size = UDim2.new( 1, -20, 1, 0 );
         Text = "build 2.4.1";
-        TextColor3 = TEXT_FAINT;
-        TextSize = 9;
-        Font = FONT;
+        TextColor3 = TX_FAINT;
+        TextSize = 8;
+        Font = FT;
         TextXAlignment = Enum.TextXAlignment.Left;
-        Parent = Footer;
+        Parent = FT_;
     } );
 
-    local StatusDot = Create( "Frame", {
-        BackgroundColor3 = RGB( 46, 204, 85 );
+    local SD = C( "Frame", {
+        BackgroundColor3 = Color3.fromRGB( 46, 204, 85 );
         BorderSizePixel = 0;
         AnchorPoint = Vector2.new( 1, 0.5 );
         Position = UDim2.new( 1, -50, 0.5, 0 );
-        Size = Off2( 5, 5 );
-        Parent = Footer;
+        Size = O2( 4, 4 );
+        Parent = FT_;
     } );
-    Corner( StatusDot, 100 );
+    CR( SD, 100 );
 
-    Create( "TextLabel", {
+    C( "TextLabel", {
         BackgroundTransparency = 1;
         AnchorPoint = Vector2.new( 1, 0.5 );
-        Position = UDim2.new( 1, -10, 0.5, 0 );
-        Size = Off2( 36, 12 );
+        Position = UDim2.new( 1, -8, 0.5, 0 );
+        Size = O2( 36, 11 );
         Text = "CONNECTED";
-        TextColor3 = TEXT_FAINT;
-        TextSize = 9;
-        Font = FONT;
+        TextColor3 = TX_FAINT;
+        TextSize = 8;
+        Font = FT;
         TextXAlignment = Enum.TextXAlignment.Right;
-        Parent = Footer;
+        Parent = FT_;
     } );
 
     -- Drag
-    local Dragging = false;
-    local DragStartMouse = Vector2.new( 0, 0 );
-    local DragStartPos = UDim2.new( 0, 0, 0, 0 );
+    local Drag = { A = false, MX = 0, MY = 0, PX = 0, PY = 0 };
 
-    TitleBar.InputBegan : Connect( function( Input )
-        if ( Input.UserInputType ~= Enum.UserInputType.MouseButton1 ) then return; end;
-
-        Dragging = true;
-        DragStartMouse = Vector2.new( Input.Position.X, Input.Position.Y );
-        DragStartPos = Window.Position;
+    TB.InputBegan : Connect( function( Inp )
+        if Inp.UserInputType ~= Enum.UserInputType.MouseButton1 then return; end;
+        Drag.A = true;
+        Drag.MX = Inp.Position.X;
+        Drag.MY = Inp.Position.Y;
+        Drag.PX = Win.Position.X.Offset;
+        Drag.PY = Win.Position.Y.Offset;
     end );
 
-    UserInputService.InputChanged : Connect( function( Input )
-        if ( not Dragging ) then return; end;
-        if ( Input.UserInputType ~= Enum.UserInputType.MouseMovement ) then return; end;
-
-        Window.Position = UDim2.new(
-            DragStartPos.X.Scale, DragStartPos.X.Offset + ( Input.Position.X - DragStartMouse.X ),
-            DragStartPos.Y.Scale, DragStartPos.Y.Offset + ( Input.Position.Y - DragStartMouse.Y )
+    UIS.InputChanged : Connect( function( Inp )
+        if not Drag.A then return; end;
+        if Inp.UserInputType ~= Enum.UserInputType.MouseMovement then return; end;
+        Win.Position = UDim2.new(
+            0.5, Drag.PX + ( Inp.Position.X - Drag.MX ),
+            0.5, Drag.PY + ( Inp.Position.Y - Drag.MY )
         );
     end );
 
-    UserInputService.InputEnded : Connect( function( Input )
-        if ( Input.UserInputType == Enum.UserInputType.MouseButton1 ) then
-            Dragging = false;
-        end;
+    UIS.InputEnded : Connect( function( Inp )
+        if Inp.UserInputType == Enum.UserInputType.MouseButton1 then Drag.A = false; end;
     end );
 
-    CloseBtn.MouseButton1Click : Connect( function() ScreenGui : Destroy(); end );
-    MinBtn.MouseButton1Click : Connect( function() Window.Visible = not Window.Visible; end );
+    Cls.MouseButton1Click : Connect( function() SG : Destroy(); end );
+    Min.MouseButton1Click : Connect( function() Win.Visible = not Win.Visible; end );
 
-    -- Tab state
-    local LeftPages = { };
-    local LeftTabs = { };
-    local RightPages = { };
-    local RightTabs = { };
+    -- State
+    local LPages, LTabs = { }, { };
+    local RPages, RTabs = { }, { };
 
     local API = setmetatable( {
-        ScreenGui = ScreenGui;
-        Window = Window;
-        RightStrip = RightStrip;
-        LeftPages = LeftPages;
-        RightPages = RightPages;
+        ScreenGui = SG;
+        Window = Win;
         Heading = nil;
     }, Interface );
 
     function API : AddLeftTab( Name )
-        if ( LeftPages[ Name ] ) then
-            return LeftPages[ Name ];
-        end;
+        if LPages[ Name ] then return LPages[ Name ]; end;
 
-        local Frame = Create( "Frame", {
+        local F = C( "Frame", {
             BackgroundTransparency = 1;
-            Size = Off2( PANEL_WIDTH - 24, 0 );
+            Size = O2( PANEL_W - 16, 0 );
             AutomaticSize = Enum.AutomaticSize.Y;
             LayoutOrder = 1;
             Visible = false;
-            Parent = LeftInner;
+            Parent = LI;
         } );
 
-        Create( "UIListLayout", {
+        C( "UIListLayout", {
             SortOrder = Enum.SortOrder.LayoutOrder;
-            Padding = Off( 5 );
-            Parent = Frame;
+            Padding = O( 4 );
+            Parent = F;
         } );
 
-        local TabAPI = MakeTab( TabHolder, Name, false, #LeftPages + 1, function()
+        local T = Tab( THolder, Name, false, #LPages + 1, function()
             API : SelectLeftTab( Name );
         end );
 
-        local Wrapped = NewPage( Frame );
-        LeftPages[ Name ] = Wrapped;
-        LeftTabs[ Name ] = TabAPI;
+        local P = setmetatable( { Frame = F }, Page );
+        LPages[ Name ] = P; LTabs[ Name ] = T;
 
-        return Wrapped;
+        -- Attach the tab order in LI so the heading appears first
+        F.LayoutOrder = 2;
+
+        return P;
     end;
 
     function API : SelectLeftTab( Name )
-        for TabName, Wrapped in pairs( LeftPages ) do
-            Wrapped.Frame.Visible = ( TabName == Name );
-        end;
+        for TN, P in pairs( LPages ) do P.Frame.Visible = ( TN == Name ); end;
+        for TN, T in pairs( LTabs ) do T : SetActive( TN == Name ); end;
 
-        for TabName, TabAPI in pairs( LeftTabs ) do
-            TabAPI : SetActive( TabName == Name );
-        end;
+        if API.Heading then API.Heading : Destroy(); end;
 
-        if ( API.Heading ) then
-            API.Heading : Destroy();
-        end;
-
-        local Holder = Create( "Frame", {
+        local Hold = C( "Frame", {
             BackgroundTransparency = 1;
-            Size = UDim2.new( 1, 0, 0, 22 );
-            LayoutOrder = 0;
-            Parent = LeftInner;
+            Size = UDim2.new( 1, 0, 0, 14 );
+            LayoutOrder = 1;
+            Parent = LI;
         } );
 
-        API.Heading = MakePanelHeading( Holder, Name );
+        API.Heading = Heading( Hold, Name );
         API.Heading.Size = UDim2.new( 1, 0, 1, 0 );
     end;
 
     function API : AddRightTab( Name )
-        if ( RightPages[ Name ] ) then
-            return RightPages[ Name ];
-        end;
+        if RPages[ Name ] then return RPages[ Name ]; end;
 
-        local Frame = Create( "Frame", {
+        local F = C( "Frame", {
             BackgroundTransparency = 1;
-            Position = Off2( 0, 30 );
-            Size = Off2( RIGHT_WIDTH - 20, 0 );
+            Size = O2( RIGHT_W - 16, 0 );
+            Position = O2( 0, 0 );
             AutomaticSize = Enum.AutomaticSize.Y;
             Visible = false;
-            Parent = RightInner;
+            Parent = RContent;
         } );
 
-        Create( "UIListLayout", {
+        C( "UIListLayout", {
             SortOrder = Enum.SortOrder.LayoutOrder;
-            Padding = Off( 5 );
-            Parent = Frame;
+            Padding = O( 4 );
+            Parent = F;
         } );
 
-        local TabAPI = MakeTab( RightStrip, Name, true, #RightPages + 1, function()
+        local T = Tab( RStrip, Name, true, #RPages + 1, function()
             API : SelectRightTab( Name );
         end );
 
-        local Wrapped = NewPage( Frame );
-        RightPages[ Name ] = Wrapped;
-        RightTabs[ Name ] = TabAPI;
+        local P = setmetatable( { Frame = F }, Page );
+        RPages[ Name ] = P; RTabs[ Name ] = T;
 
-        return Wrapped;
+        return P;
     end;
 
     function API : SelectRightTab( Name )
-        for TabName, Wrapped in pairs( RightPages ) do
-            Wrapped.Frame.Visible = ( TabName == Name );
-        end;
-
-        for TabName, TabAPI in pairs( RightTabs ) do
-            TabAPI : SetActive( TabName == Name );
-        end;
+        for TN, P in pairs( RPages ) do P.Frame.Visible = ( TN == Name ); end;
+        for TN, T in pairs( RTabs ) do T : SetActive( TN == Name ); end;
     end;
 
-    -- Fit window to tallest tab
-    task.defer( function()
+    -- Fit-to-content, deferred so AbsoluteSize settles
+    task.spawn( function()
         task.wait( 0.1 );
 
-        local MaxHeight = 260;
+        local LeftH, RightH = 0, 0;
 
-        for _, Wrapped in pairs( LeftPages ) do
-            MaxHeight = math.max( MaxHeight, Wrapped.Frame.AbsoluteSize.Y + 40 );
+        for _, P in pairs( LPages ) do
+            LeftH = math.max( LeftH, P.Frame.AbsoluteSize.Y );
+        end;
+        for _, P in pairs( RPages ) do
+            RightH = math.max( RightH, P.Frame.AbsoluteSize.Y );
         end;
 
-        for _, Wrapped in pairs( RightPages ) do
-            MaxHeight = math.max( MaxHeight, Wrapped.Frame.AbsoluteSize.Y + 60 );
-        end;
+        local BodyH = math.max( LeftH + 16, RightH + 44, 140 );
 
-        Body.Size = UDim2.new( 1, 0, 0, MaxHeight );
-        LeftPanel.Size = Off2( PANEL_WIDTH, MaxHeight );
-        RightPanel.Size = Off2( RIGHT_WIDTH, MaxHeight );
+        Body.Size = UDim2.new( 1, 0, 0, BodyH );
+        LP.Size = O2( PANEL_W, BodyH );
+        Div.Size = O2( 1, BodyH );
+        RP.Size = O2( RIGHT_W, BodyH );
 
-        Window.Size = Off2( 420, 26 + 28 + MaxHeight + 20 );
+        Win.Size = O2( 400, 22 + 26 + BodyH + 18 );
     end );
 
     return API;
