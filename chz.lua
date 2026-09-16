@@ -1,12 +1,15 @@
 --[[
     juanita****.club — Ported from App.tsx / index.css
 
+    Executor compatibility:
+      UDim.fromOffset / UDim2.fromOffset are shimmed (some builds lack them).
+
     Visual fidelity notes:
-      - CSS box-shadow: inset  → 1px dark Frame at top of surface
-      - CSS box-shadow: 0 0 Npx accent  → UIStroke with high Transparency
-      - CSS radial-gradient  → solid BG + transparent ScreenGui
-      - CSS linear-gradient  → UIGradient (Rotation 90 = top→bottom)
-      - CSS flex gap  → UIListLayout.Padding
+      - CSS box-shadow: inset          -> 1px dark Frame at top of surface
+      - CSS box-shadow: 0 0 Npx accent -> UIStroke with high Transparency
+      - CSS radial-gradient            -> solid BG + transparent ScreenGui
+      - CSS linear-gradient            -> UIGradient (Rotation 90 = top->bottom)
+      - CSS flex gap                   -> UIListLayout.Padding
 ]]
 
 local Game = game;
@@ -17,16 +20,24 @@ local TweenService      = Game : GetService( "TweenService" );
 local CoreGui           = Game : GetService( "CoreGui" );
 
 -- Cache
-local InstanceNew             = Instance.new;
-local TweenInfoNew            = TweenInfo.new;
-local Color3New               = Color3.new;
-local Color3FromRGB           = Color3.fromRGB;
-local UDim2New                = UDim2.new;
-local UDim2FromOffset         = UDim2.fromOffset;
-local UDimFromOffset          = UDim.fromOffset;
-local Vector2New              = Vector2.new;
-local ColorSequenceNew        = ColorSequence.new;
+local InstanceNew              = Instance.new;
+local TweenInfoNew             = TweenInfo.new;
+local Color3New                = Color3.new;
+local Color3FromRGB            = Color3.fromRGB;
+local UDim2New                 = UDim2.new;
+local UDimNew                  = UDim.new;
+local Vector2New               = Vector2.new;
+local ColorSequenceNew         = ColorSequence.new;
 local ColorSequenceKeypointNew = ColorSequenceKeypoint.new;
+
+-- Shims: some executors don't expose UDim.fromOffset / UDim2.fromOffset
+local function UDimFromOffset( Offset )
+    return UDimNew( 0, Offset );
+end;
+
+local function UDim2FromOffset( X, Y )
+    return UDim2New( 0, X or 0, 0, Y or 0 );
+end;
 
 -- Palette
 const ACCENT        = Color3FromRGB( 212, 90, 16 );
@@ -57,7 +68,10 @@ const FONT          = Enum.Font.Gotham;
 const FONT_MEDIUM   = Enum.Font.GothamMedium;
 const FONT_BOLD     = Enum.Font.GothamBold;
 
--- ── Utilities ─────────────────────────────────────────────────────────────────
+const PANEL_WIDTH   = 230;
+const RIGHT_WIDTH   = 190;
+
+-- ── Utilities ────────────────────────────────────────────────────────────────
 
 local function Create( Class, Properties )
     local Object = InstanceNew( Class );
@@ -100,7 +114,7 @@ local function ApplyStroke( Object, Color, Thickness, Transparency )
     } );
 end;
 
--- ── Atoms ─────────────────────────────────────────────────────────────────────
+-- ── Atoms ────────────────────────────────────────────────────────────────────
 
 local function MakeCheckbox( Parent, Text, Default, Callback )
     local State = { Value = Default or false, Hovered = false };
@@ -383,7 +397,7 @@ local function MakeDropdown( Parent, Options, Default, Callback )
         BackgroundTransparency = 1;
         Position = UDim2New( 1, -14, 0, 0 );
         Size = UDim2FromOffset( 10, 20 );
-        Text = "▾";
+        Text = "v";
         TextColor3 = Color3FromRGB( 136, 136, 136 );
         TextSize = 10;
         Font = FONT_BOLD;
@@ -525,8 +539,11 @@ local function MakeDropdown( Parent, Options, Default, Callback )
         const ListPos = List.AbsolutePosition;
         const ListSize = List.AbsoluteSize;
 
-        if ( Mouse.X < ListPos.X ) or ( Mouse.X > ListPos.X + ListSize.X )
-            or ( Mouse.Y < ListPos.Y ) or ( Mouse.Y > ListPos.Y + ListSize.Y + 20 ) then
+        local HitX = Mouse.X >= ListPos.X and Mouse.X <= ListPos.X + ListSize.X;
+        local HitY = ( Mouse.Y >= ListPos.Y - 20 and Mouse.Y <= ListPos.Y + ListSize.Y )
+                  or ( Mouse.Y + 36 >= ListPos.Y - 20 and Mouse.Y + 36 <= ListPos.Y + ListSize.Y );
+
+        if not ( HitX and HitY ) then
             State.Open = false;
             Refresh();
         end;
@@ -696,6 +713,11 @@ local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
         Parent = Tab;
     } );
 
+    local function Measure()
+        local Padding = Small and 18 or 24;
+        Tab.Size = UDim2FromOffset( Label.TextBounds.X + Padding, Small and 22 or 24 );
+    end;
+
     local function Refresh()
         if ( State.Active ) then
             Tab.BackgroundColor3 = Color3FromRGB( 32, 32, 32 );
@@ -714,8 +736,7 @@ local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
             TopBorder.BackgroundColor3 = BORDER_FAINT;
         end;
 
-        local Padding = Small and 18 or 24;
-        Tab.Size = UDim2FromOffset( Label.TextBounds.X + Padding, Small and 22 or 24 );
+        Measure();
     end;
 
     Tab.MouseButton1Click : Connect( function()
@@ -729,16 +750,52 @@ local function MakeTab( Parent, Text, Small, LayoutOrder, OnClick )
 
     Refresh();
 
+    task.defer( Measure );
+
     return {
         Tab = Tab;
         SetActive = function( Value ) State.Active = Value; Refresh(); end;
     };
 end;
 
--- ── Window ────────────────────────────────────────────────────────────────────
+-- ── Page (wraps a Frame, exposes atom constructors) ─────────────────────────
 
-const PANEL_WIDTH = 230;
-const RIGHT_WIDTH = 190;
+local Page = { };
+Page.__index = Page;
+
+function Page.new( Frame )
+    return setmetatable( { Frame = Frame }, Page );
+end;
+
+function Page : Checkbox( Label, Default, Callback )
+    return MakeCheckbox( self.Frame, Label, Default, Callback );
+end;
+
+function Page : Slider( Label, Default, Callback )
+    return MakeSlider( self.Frame, Label, Default, Callback );
+end;
+
+function Page : Dropdown( Options, Default, Callback )
+    return MakeDropdown( self.Frame, Options, Default, Callback );
+end;
+
+function Page : KeyBind( Label )
+    return MakeKeyBind( self.Frame, Label );
+end;
+
+function Page : ColorSwatch( ColorA, ColorB, BorderColor )
+    return MakeColorSwatch( self.Frame, ColorA, ColorB, BorderColor );
+end;
+
+function Page : Divider()
+    return MakeDivider( self.Frame );
+end;
+
+function Page : Label( Text )
+    return MakeSectionLabel( self.Frame, Text );
+end;
+
+-- ── Interface ────────────────────────────────────────────────────────────────
 
 local Interface = { };
 Interface.__index = Interface;
@@ -841,7 +898,7 @@ function Interface.new( Title )
         BorderSizePixel = 0;
         Position = UDim2FromOffset( 0, 0 );
         Size = UDim2FromOffset( 18, 14 );
-        Text = "−";
+        Text = "-";
         TextColor3 = Color3FromRGB( 144, 144, 144 );
         TextSize = 11;
         Font = FONT;
@@ -856,7 +913,7 @@ function Interface.new( Title )
         BorderSizePixel = 0;
         Position = UDim2FromOffset( 21, 0 );
         Size = UDim2FromOffset( 18, 14 );
-        Text = "✕";
+        Text = "x";
         TextColor3 = Color3FromRGB( 238, 238, 238 );
         TextSize = 10;
         Font = FONT;
@@ -1054,114 +1111,7 @@ function Interface.new( Title )
         Window.Visible = not Window.Visible;
     end );
 
-    -- Left area holds a single active page at a time
-    const LeftPages = { };
-    const LeftTabs = { };
-    const RightPages = { };
-    const RightTabs = { };
-
-    local API = setmetatable( {
-        ScreenGui = ScreenGui;
-        Window = Window;
-        TabHolder = TabHolder;
-        RightInner = RightInner;
-        LeftInner = LeftInner;
-        LeftPages = LeftPages;
-        RightPages = RightPages;
-        MainTabs = LeftTabs;
-        RightTabs = RightTabs;
-        ActiveLeftTab = nil;
-        ActiveRightTab = nil;
-    }, Interface );
-
-    function API : AddLeftTab( Name )
-        if ( LeftPages[ Name ] ) then
-            return LeftPages[ Name ];
-        end;
-
-        const Page = Create( "Frame", {
-            BackgroundTransparency = 1;
-            Size = UDim2FromOffset( PANEL_WIDTH - 24, 0 );
-            AutomaticSize = Enum.AutomaticSize.Y;
-            LayoutOrder = 1;
-            Visible = false;
-            Parent = LeftInner;
-        } );
-
-        Create( "UIListLayout", {
-            SortOrder = Enum.SortOrder.LayoutOrder;
-            Padding = UDimFromOffset( 5 );
-            Parent = Page;
-        } );
-
-        const TabAPI = MakeTab( TabHolder, Name, false, #LeftPages + 1, function()
-            API : SelectLeftTab( Name );
-        end );
-
-        LeftPages[ Name ] = Page;
-        LeftTabs[ Name ] = TabAPI;
-
-        return Page;
-    end;
-
-    function API : SelectLeftTab( Name )
-        for TabName, Page in pairs( LeftPages ) do
-            Page.Visible = ( TabName == Name );
-        end;
-
-        for TabName, Tab in pairs( LeftTabs ) do
-            Tab : SetActive( TabName == Name );
-        end;
-
-        API.ActiveLeftTab = Name;
-
-        if ( API.Heading ) then
-            API.Heading : Destroy();
-        end;
-
-        const Holder = Create( "Frame", {
-            BackgroundTransparency = 1;
-            Size = UDim2New( 1, 0, 0, 22 );
-            LayoutOrder = 0;
-            Parent = LeftInner;
-        } );
-        API.Heading = MakePanelHeading( Holder, Name );
-        API.Heading.Size = UDim2New( 1, 0, 1, 0 );
-    end;
-
-    function API : AddRightTab( Name )
-        if ( RightPages[ Name ] ) then
-            return RightPages[ Name ];
-        end;
-
-        const Page = Create( "Frame", {
-            BackgroundTransparency = 1;
-            Size = UDim2FromOffset( RIGHT_WIDTH - 20, 0 );
-            AutomaticSize = Enum.AutomaticSize.Y;
-            Visible = false;
-            Parent = RightInner;
-        } );
-
-        Create( "UIListLayout", {
-            SortOrder = Enum.SortOrder.LayoutOrder;
-            Padding = UDimFromOffset( 5 );
-            Parent = Page;
-        } );
-
-        RightPages[ Name ] = Page;
-        RightTabs[ Name ] = Page;
-
-        return Page;
-    end;
-
-    function API : SelectRightTab( Name )
-        for TabName, Page in pairs( RightPages ) do
-            Page.Visible = ( TabName == Name );
-        end;
-        API.ActiveRightTab = Name;
-    end;
-
-    -- Right sub-tab strip (drawn on top of the right panel)
+    -- Right sub-tab strip
     const RightStrip = Create( "Frame", {
         BackgroundTransparency = 1;
         Position = UDim2FromOffset( 0, 0 );
@@ -1185,20 +1135,133 @@ function Interface.new( Title )
         Parent = RightStrip;
     } );
 
-    API.RightStrip = RightStrip;
+    -- State
+    const LeftPages = { };
+    const LeftTabs = { };
+    const RightPages = { };
+    const RightTabs = { };
+
+    const API = setmetatable( {
+        ScreenGui = ScreenGui;
+        Window = Window;
+        TabHolder = TabHolder;
+        RightStrip = RightStrip;
+        LeftInner = LeftInner;
+        RightInner = RightInner;
+        LeftPages = LeftPages;
+        RightPages = RightPages;
+        LeftTabs = LeftTabs;
+        RightTabs = RightTabs;
+        Heading = nil;
+        ActiveLeftTab = nil;
+        ActiveRightTab = nil;
+    }, Interface );
+
+    function API : AddLeftTab( Name )
+        if ( LeftPages[ Name ] ) then
+            return LeftPages[ Name ];
+        end;
+
+        const Frame = Create( "Frame", {
+            BackgroundTransparency = 1;
+            Size = UDim2FromOffset( PANEL_WIDTH - 24, 0 );
+            AutomaticSize = Enum.AutomaticSize.Y;
+            LayoutOrder = 1;
+            Visible = false;
+            Parent = LeftInner;
+        } );
+
+        Create( "UIListLayout", {
+            SortOrder = Enum.SortOrder.LayoutOrder;
+            Padding = UDimFromOffset( 5 );
+            Parent = Frame;
+        } );
+
+        const TabAPI = MakeTab( TabHolder, Name, false, #LeftPages + 1, function()
+            API : SelectLeftTab( Name );
+        end );
+
+        const Wrapped = Page.new( Frame );
+
+        LeftPages[ Name ] = Wrapped;
+        LeftTabs[ Name ] = TabAPI;
+
+        return Wrapped;
+    end;
+
+    function API : SelectLeftTab( Name )
+        for TabName, Wrapped in pairs( LeftPages ) do
+            Wrapped.Frame.Visible = ( TabName == Name );
+        end;
+
+        for TabName, TabAPI in pairs( LeftTabs ) do
+            TabAPI : SetActive( TabName == Name );
+        end;
+
+        API.ActiveLeftTab = Name;
+
+        if ( API.Heading ) then
+            API.Heading : Destroy();
+        end;
+
+        const Holder = Create( "Frame", {
+            BackgroundTransparency = 1;
+            Size = UDim2New( 1, 0, 0, 22 );
+            LayoutOrder = 0;
+            Parent = LeftInner;
+        } );
+
+        API.Heading = MakePanelHeading( Holder, Name );
+        API.Heading.Size = UDim2New( 1, 0, 1, 0 );
+    end;
+
+    function API : AddRightTab( Name )
+        if ( RightPages[ Name ] ) then
+            return RightPages[ Name ];
+        end;
+
+        const Frame = Create( "Frame", {
+            BackgroundTransparency = 1;
+            Position = UDim2FromOffset( 0, 30 );
+            Size = UDim2FromOffset( RIGHT_WIDTH - 20, 0 );
+            AutomaticSize = Enum.AutomaticSize.Y;
+            Visible = false;
+            Parent = RightInner;
+        } );
+
+        Create( "UIListLayout", {
+            SortOrder = Enum.SortOrder.LayoutOrder;
+            Padding = UDimFromOffset( 5 );
+            Parent = Frame;
+        } );
+
+        const Wrapped = Page.new( Frame );
+
+        RightPages[ Name ] = Wrapped;
+        RightTabs[ Name ] = Wrapped;
+
+        return Wrapped;
+    end;
+
+    function API : SelectRightTab( Name )
+        for TabName, Wrapped in pairs( RightPages ) do
+            Wrapped.Frame.Visible = ( TabName == Name );
+        end;
+        API.ActiveRightTab = Name;
+    end;
 
     -- Resize window to fit content
     task.defer( function()
-        task.wait();
+        task.wait( 0.1 );
 
         local MaxHeight = 260;
 
-        for _, Page in pairs( LeftPages ) do
-            MaxHeight = math.max( MaxHeight, Page.AbsoluteSize.Y + 40 );
+        for _, Wrapped in pairs( LeftPages ) do
+            MaxHeight = math.max( MaxHeight, Wrapped.Frame.AbsoluteSize.Y + 40 );
         end;
 
-        for _, Page in pairs( RightPages ) do
-            MaxHeight = math.max( MaxHeight, Page.AbsoluteSize.Y + 60 );
+        for _, Wrapped in pairs( RightPages ) do
+            MaxHeight = math.max( MaxHeight, Wrapped.Frame.AbsoluteSize.Y + 60 );
         end;
 
         Body.Size = UDim2New( 1, 0, 0, MaxHeight );
@@ -1214,91 +1277,4 @@ function Interface.new( Title )
     return API;
 end;
 
--- Public helper: build a checkbox inside a Page
-function Interface : Checkbox( Label, Default, Callback )
-    return MakeCheckbox( self, Label, Default, Callback );
-end;
-
-function Interface : Slider( Label, Default, Callback )
-    return MakeSlider( self, Label, Default, Callback );
-end;
-
-function Interface : Dropdown( Options, Default, Callback )
-    return MakeDropdown( self, Options, Default, Callback );
-end;
-
-function Interface : Divider()
-    return MakeDivider( self );
-end;
-
-function Interface : Label( Text )
-    return MakeSectionLabel( self, Text );
-end;
-
-
-
--- ── Example usage ─────────────────────────────────────────────────────────────
-
---[[
-    Copy the code above into a LocalScript / executor and then run the block
-    below. It builds a fully functional window with two left tabs and one
-    right sub-tab, wired up to print their values.
-
-    local UI = Interface.new( "my menu" )
-
-    -- ── Left tab: Combat ───────────────────────────────────────────────
-    local Combat = UI : AddLeftTab( "Combat" )
-
-    Combat : Checkbox( "Enabled", true, function( Value )
-        print( "[Combat] Enabled =", Value )
-    end )
-
-    Combat : Checkbox( "Silent Aim", false, function( Value )
-        print( "[Combat] Silent Aim =", Value )
-    end )
-
-    Combat : Slider( "FOV", 50, function( Value )
-        print( "[Combat] FOV =", Value )
-    end )
-
-    Combat : Divider()
-    Combat : Label( "Hitbox" )
-
-    Combat : Dropdown( { "Head", "Neck", "Body", "Legs" }, "Head", function( Choice )
-        print( "[Combat] Hitbox =", Choice )
-    end )
-
-    -- ── Left tab: Misc ─────────────────────────────────────────────────
-    local Misc = UI : AddLeftTab( "Misc" )
-
-    for _, Name in ipairs( { "Bunny Hop", "Auto Strafe", "Radar", "No Flash" } ) do
-        Misc : Checkbox( Name, false, function( Value )
-            print( "[Misc]", Name, "=", Value )
-        end )
-    end
-
-    -- ── Right sub-tab: Visuals ────────────────────────────────────────
-    local Visuals = UI : AddRightTab( "Visuals" )
-
-    Visuals : Checkbox( "Player ESP", true, function( Value )
-        print( "[ESP] Player =", Value )
-    end )
-
-    Visuals : Dropdown( { "Box", "Corner", "3D", "None" }, "Box", function( Choice )
-        print( "[ESP] Style =", Choice )
-    end )
-
-    -- Right sub-tab strip buttons (small style)
-    MakeTab( UI.RightStrip, "Visuals", true, 1, function()
-        UI : SelectRightTab( "Visuals" )
-    end ) : SetActive( true )
-
-    -- ── Show the initial tabs ──────────────────────────────────────────
-    UI : SelectLeftTab( "Combat" )
-    UI : SelectRightTab( "Visuals" )
-
-    print( "Window ready." )
-]]
-
 return Interface;
-
