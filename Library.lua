@@ -1282,16 +1282,28 @@ do
                             Parent = saturationframe
                         })
 
-                        local hueframe = utility.create("ImageLabel", {
-                            ZIndex = 12,
-                            Size = UDim2.new(0, 14, 0, 100),
-                            Position = UDim2.new(1, -20, 0, 6),
-                            BorderSizePixel = 0,
-                            BackgroundColor3 = Color3.fromRGB(255, 193, 49),
-                            ScaleType = Enum.ScaleType.Crop,
-                            Image = "http://www.roblox.com/asset/?id=8630799159",
-                            Parent = colorpickerframe
-                        })
+		local hueframe = utility.create("Frame", {
+			ZIndex = 12,
+			Size = UDim2.new(0, 14, 0, 100),
+			Position = UDim2.new(1, -20, 0, 6),
+			BorderSizePixel = 0,
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			Parent = colorpickerframe
+		})
+
+		utility.create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(1 / 6, Color3.fromRGB(255, 0, 255)),
+				ColorSequenceKeypoint.new(2 / 6, Color3.fromRGB(0, 0, 255)),
+				ColorSequenceKeypoint.new(3 / 6, Color3.fromRGB(0, 255, 255)),
+				ColorSequenceKeypoint.new(4 / 6, Color3.fromRGB(0, 255, 0)),
+				ColorSequenceKeypoint.new(5 / 6, Color3.fromRGB(255, 255, 0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+			}),
+			Parent = hueframe
+		})
 
                         local grayborder = utility.create("Frame", {
                             ZIndex = 11,
@@ -3274,16 +3286,28 @@ do
                         Parent = saturationframe
                     })
 
-                    local hueframe = utility.create("ImageLabel", {
-                        ZIndex = 12,
-                        Size = UDim2.new(0, 14, 0, 100),
-                        Position = UDim2.new(1, -20, 0, 6),
-                        BorderSizePixel = 0,
-                        BackgroundColor3 = Color3.fromRGB(255, 193, 49),
-                        ScaleType = Enum.ScaleType.Crop,
-                        Image = "http://www.roblox.com/asset/?id=8630799159",
-                        Parent = colorpickerframe
-                    })
+		local hueframe = utility.create("Frame", {
+			ZIndex = 12,
+			Size = UDim2.new(0, 14, 0, 100),
+			Position = UDim2.new(1, -20, 0, 6),
+			BorderSizePixel = 0,
+			BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+			Parent = colorpickerframe
+		})
+
+		utility.create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+				ColorSequenceKeypoint.new(1 / 6, Color3.fromRGB(255, 0, 255)),
+				ColorSequenceKeypoint.new(2 / 6, Color3.fromRGB(0, 0, 255)),
+				ColorSequenceKeypoint.new(3 / 6, Color3.fromRGB(0, 255, 255)),
+				ColorSequenceKeypoint.new(4 / 6, Color3.fromRGB(0, 255, 0)),
+				ColorSequenceKeypoint.new(5 / 6, Color3.fromRGB(255, 255, 0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+			}),
+			Parent = hueframe
+		})
 
                     local grayborder = utility.create("Frame", {
                         ZIndex = 11,
