@@ -1247,6 +1247,7 @@ do
                         local saturationframe = utility.create("ImageLabel", {
                             ZIndex = 12,
                             Size = UDim2.new(0, 128, 0, 100),
+                            Active = true,
                             BorderColor3 = Color3.fromRGB(50, 50, 50),
                             Position = UDim2.new(0, 6, 0, 6),
                             BorderSizePixel = 0,
@@ -3238,6 +3239,7 @@ do
                     local saturationframe = utility.create("ImageLabel", {
                         ZIndex = 12,
                         Size = UDim2.new(0, 128, 0, 100),
+                        Active = true,
                         BorderColor3 = Color3.fromRGB(50, 50, 50),
                         Position = UDim2.new(0, 6, 0, 6),
                         BorderSizePixel = 0,
