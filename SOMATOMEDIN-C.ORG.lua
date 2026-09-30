@@ -1,12 +1,6 @@
 --[[
-    2/22/2026
-    Library.lua
-    Purpose:
-        NH ui library
-
-    Author: @joestar._3
-    Dependencies:
-        None
+    09/30/2026
+    Mogged ^ Jewed out ui.
 ]]
 
 -- hi guys
@@ -721,11 +715,17 @@ do
     end
 
     Library.IsMouseOverFrame = function(Self)
-        if not Self.Instance then
+        -- Accepts a library item or a raw GuiObject. Some callers hand this an instance
+        -- directly -- Library.OpenFrames holds the keybind window as the raw TextButton
+        -- the keybind was built from, not as an item -- and those call sites used to
+        -- invoke the method on the instance itself, which raised
+        -- "IsMouseOverFrame is not a valid member of TextButton". Reading .Instance off
+        -- a real instance answers nil rather than raising, so one path covers both.
+        local Object = Self.Instance or Self
+
+        if not Object or typeof(Object) ~= "Instance" then
             return
         end
-
-        local Object = Self.Instance
 
         local MousePosition = Vector2.new(Mouse.X, Mouse.Y)
 
@@ -8695,7 +8695,7 @@ do
                                     and OpenFrame ~= Settingss
                                     and OpenFrame.IsOpen
                                     and OpenFrame.Frame
-                                    and OpenFrame.Frame:IsMouseOverFrame()
+                                    and Library:IsMouseOverFrame(OpenFrame.Frame)
                                 then
                                     return
                                 end
